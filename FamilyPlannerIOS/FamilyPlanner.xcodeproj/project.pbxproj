@@ -292,8 +292,9 @@
 				DEVELOPMENT_TEAM = "";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "Family Planner can add due dates to your Apple Calendar when you choose that action.";
-				INFOPLIST_KEY_NSCalendarsUsageDescription = "Family Planner can add due dates to your Apple Calendar when you choose that action.";
+				INFOPLIST_KEY_CFBundleDisplayName = "Family Hub";
+				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "Family Hub can add due dates to your Apple Calendar when you choose that action.";
+				INFOPLIST_KEY_NSCalendarsUsageDescription = "Family Hub can add due dates to your Apple Calendar when you choose that action.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -322,8 +323,9 @@
 				DEVELOPMENT_TEAM = "";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "Family Planner can add due dates to your Apple Calendar when you choose that action.";
-				INFOPLIST_KEY_NSCalendarsUsageDescription = "Family Planner can add due dates to your Apple Calendar when you choose that action.";
+				INFOPLIST_KEY_CFBundleDisplayName = "Family Hub";
+				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "Family Hub can add due dates to your Apple Calendar when you choose that action.";
+				INFOPLIST_KEY_NSCalendarsUsageDescription = "Family Hub can add due dates to your Apple Calendar when you choose that action.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;

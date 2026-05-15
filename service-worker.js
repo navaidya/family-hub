@@ -1,11 +1,11 @@
-const CACHE_NAME = "family-planner-pwa-v1";
+const CACHE_NAME = "family-hub-pwa-v1";
 const APP_SHELL = [
   "./",
   "./index.html",
   "./styles.css",
   "./app.js",
   "./manifest.webmanifest",
-  "./icons/family-planner-icon.svg",
+  "./icons/family-hub-icon.svg",
 ];
 
 self.addEventListener("install", (event) => {

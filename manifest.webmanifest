@@ -1,6 +1,6 @@
 {
-  "name": "Family Planner",
-  "short_name": "Planner",
+  "name": "Family Hub",
+  "short_name": "Family Hub",
   "description": "A shared family planner for tasks, asks, due dates, comments, and reminders.",
   "start_url": "./index.html",
   "scope": "./",
@@ -10,7 +10,7 @@
   "theme_color": "#0f766e",
   "icons": [
     {
-      "src": "icons/family-planner-icon.svg",
+      "src": "icons/family-hub-icon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any maskable"
@@ -21,11 +21,11 @@
     {
       "name": "New task",
       "short_name": "New task",
-      "description": "Open Family Planner and add a new task.",
+      "description": "Open Family Hub and add a new task.",
       "url": "./index.html?action=new-task",
       "icons": [
         {
-          "src": "icons/family-planner-icon.svg",
+          "src": "icons/family-hub-icon.svg",
           "sizes": "any",
           "type": "image/svg+xml"
         }

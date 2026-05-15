@@ -14,11 +14,13 @@ final class PlannerStore: ObservableObject {
         didSet { save() }
     }
 
-    private let storageKey = "family-planner-ios-state-v1"
+    private let storageKey = "family-hub-ios-state-v1"
+    private let legacyStorageKey = "family-planner-ios-state-v1"
 
     init() {
+        let storedData = UserDefaults.standard.data(forKey: storageKey) ?? UserDefaults.standard.data(forKey: legacyStorageKey)
         if
-            let data = UserDefaults.standard.data(forKey: storageKey),
+            let data = storedData,
             let snapshot = try? JSONDecoder.planner.decode(PlannerSnapshot.self, from: data)
         {
             members = snapshot.members
@@ -112,6 +114,7 @@ final class PlannerStore: ObservableObject {
         let snapshot = PlannerSnapshot(members: members, tasks: tasks, currentMemberId: currentMemberId)
         guard let data = try? JSONEncoder.planner.encode(snapshot) else { return }
         UserDefaults.standard.set(data, forKey: storageKey)
+        UserDefaults.standard.removeObject(forKey: legacyStorageKey)
     }
 }
 

@@ -1,6 +1,6 @@
-# Family Planner
+# Family Hub
 
-A browser-based family task planner with a task list, task discussion, assignment, calendar due-date tracking, and email reminder composition.
+A browser-based family hub with a task list, task discussion, assignment, calendar due-date tracking, and email reminder composition.
 
 Open `index.html` in a browser. Tasks are saved to local browser storage, and backup import/export is available from the header.
 
@@ -20,6 +20,6 @@ The web planner now includes Progressive Web App files:
 
 - `manifest.webmanifest`
 - `service-worker.js`
-- `icons/family-planner-icon.svg`
+- `icons/family-hub-icon.svg`
 
 When hosted on HTTPS, family members can open the web address in Safari on iPhone, use Share -> Add to Home Screen, and launch it like an app. Service workers do not run from a `file://` URL, so offline caching starts after serving or hosting the app over `http://localhost` or HTTPS.

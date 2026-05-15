@@ -1,6 +1,6 @@
-# Family Planner iOS
+# Family Hub iOS
 
-Native SwiftUI version of the family planner.
+Native SwiftUI version of Family Hub.
 
 ## What is implemented
 
@@ -14,6 +14,6 @@ Native SwiftUI version of the family planner.
 
 ## Open and run
 
-Open `FamilyPlanner.xcodeproj` in Xcode, select an iPhone simulator or physical iPhone, then run the `FamilyPlanner` target.
+Open `FamilyPlanner.xcodeproj` in Xcode, select an iPhone simulator or physical iPhone, then run the app target.
 
 This app currently stores data locally on one device. To share live data across everyone’s Apple devices, the next native step is CloudKit/iCloud sync, followed by widgets and richer notification actions.

@@ -27,7 +27,7 @@ struct TaskListView: View {
                 statusFilterSection
                 taskSection
             }
-            .navigationTitle("Family Planner")
+            .navigationTitle("Family Hub")
             .searchable(text: $query, prompt: "Search tasks")
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {

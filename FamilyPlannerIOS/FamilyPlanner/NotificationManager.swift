@@ -26,7 +26,7 @@ final class NotificationManager {
         }
 
         let content = UNMutableNotificationContent()
-        content.title = "Family Planner"
+        content.title = "Family Hub"
         content.body = "\(task.title) is due for \(assigneeName)."
         content.sound = .default
 

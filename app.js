@@ -1,4 +1,5 @@
-const STORAGE_KEY = "family-planner-state-v1";
+const STORAGE_KEY = "family-hub-state-v1";
+const LEGACY_STORAGE_KEY = "family-planner-state-v1";
 
 const statuses = [
   { id: "all", label: "All" },
@@ -126,7 +127,7 @@ registerServiceWorker();
 handleLaunchAction();
 
 function loadState() {
-  const saved = localStorage.getItem(STORAGE_KEY);
+  const saved = localStorage.getItem(STORAGE_KEY) || localStorage.getItem(LEGACY_STORAGE_KEY);
   if (saved) {
     try {
       const parsed = JSON.parse(saved);
@@ -308,6 +309,7 @@ function render() {
 
 function saveState() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  localStorage.removeItem(LEGACY_STORAGE_KEY);
 }
 
 function renderCurrentProfile() {
@@ -829,7 +831,7 @@ function sendTaskEmail(task) {
     return;
   }
 
-  const subject = `Family Planner: ${task.title}`;
+  const subject = `Family Hub: ${task.title}`;
   const body = [
     `Task: ${task.title}`,
     `Status: ${statusLabel(task.status)}`,
@@ -871,7 +873,7 @@ function sendDigestEmail() {
 
   openMail(
     recipients.join(","),
-    "Family Planner digest",
+    "Family Hub digest",
     `Family task progress\n\n${body}`,
   );
 }
@@ -881,7 +883,7 @@ function exportState() {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = `family-planner-${isoToday}.json`;
+  link.download = `family-hub-${isoToday}.json`;
   link.click();
   URL.revokeObjectURL(url);
 }
