@@ -333,7 +333,7 @@ function renderMemberStrip() {
           <div class="avatar" style="background:${member.color}">${initials(member.name)}</div>
           <div>
             <strong>${escapeHTML(member.name)}</strong>
-            <span>${member.age} yrs · ${assigned} assigned · ${requested} asked</span>
+            <span>${assigned} assigned · ${requested} asked</span>
           </div>
         </button>
       `;

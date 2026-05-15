@@ -14,7 +14,7 @@ struct ProfilesView: View {
                         VStack(alignment: .leading) {
                             Text(store.currentMember.name)
                                 .font(.title3.weight(.bold))
-                            Text("\(store.currentMember.age) years old")
+                            Text("Signed in profile")
                                 .foregroundStyle(.secondary)
                         }
                     }
@@ -33,7 +33,7 @@ struct ProfilesView: View {
                             VStack(alignment: .leading) {
                                 Text(member.name)
                                     .font(.headline)
-                                Text("\(member.age) yrs · \(assignedCount(for: member)) assigned · \(requestedCount(for: member)) asked")
+                                Text("\(assignedCount(for: member)) assigned · \(requestedCount(for: member)) asked")
                                     .font(.subheadline)
                                     .foregroundStyle(.secondary)
                             }
