@@ -72,7 +72,6 @@ const elements = {
   taskDetail: document.querySelector("#taskDetail"),
   calendarGrid: document.querySelector("#calendarGrid"),
   monthLabel: document.querySelector("#monthLabel"),
-  contactsForm: document.querySelector("#contactsForm"),
   reminderList: document.querySelector("#reminderList"),
   searchInput: document.querySelector("#searchInput"),
   newTaskBtn: document.querySelector("#newTaskBtn"),
@@ -303,7 +302,6 @@ function render() {
   renderTasks();
   renderDetail();
   renderCalendar();
-  renderContacts();
   renderReminders();
   refreshIcons();
 }
@@ -677,32 +675,6 @@ function renderCalendar() {
   });
 }
 
-function renderContacts() {
-  elements.contactsForm.innerHTML = `
-    <h3>Contacts</h3>
-    ${state.members
-      .map(
-        (member) => `
-          <div class="contact-row ${member.id === state.currentMemberId ? "current" : ""}">
-            <label for="email-${member.id}">${escapeHTML(member.name)}</label>
-            <input id="email-${member.id}" type="email" value="${escapeAttribute(member.email)}" data-member-email="${member.id}" autocomplete="email" />
-          </div>
-        `,
-      )
-      .join("")}
-  `;
-
-  elements.contactsForm.querySelectorAll("[data-member-email]").forEach((input) => {
-    input.addEventListener("change", () => {
-      const member = state.members.find((item) => item.id === input.dataset.memberEmail);
-      if (!member) return;
-      member.email = input.value.trim();
-      saveState();
-      renderCurrentProfile();
-    });
-  });
-}
-
 function renderReminders() {
   const tasks = getSortedTasks()
     .filter((task) => task.status !== "done")
@@ -853,7 +825,7 @@ function advanceTask(id) {
 function sendTaskEmail(task) {
   const recipient = memberEmail(task.assignee || task.requester);
   if (!recipient) {
-    window.alert("Add an email address in Contacts first.");
+    window.alert("Add an email address in that member's profile first.");
     return;
   }
 
@@ -881,7 +853,7 @@ function sendDigestEmail() {
     .map((member) => member.email)
     .filter(Boolean);
   if (!recipients.length) {
-    window.alert("Add email addresses in Contacts first.");
+    window.alert("Add email addresses in profile settings first.");
     return;
   }
 

@@ -536,7 +536,6 @@ label.import-button {
 
 .comment-form select,
 .comment-form input,
-.contacts-form input,
 .login-grid button,
 .task-dialog input,
 .task-dialog select,
@@ -550,7 +549,6 @@ label.import-button {
 
 .comment-form select,
 .comment-form input,
-.contacts-form input,
 .task-dialog input,
 .task-dialog select {
   padding: 0 10px;
@@ -720,36 +718,6 @@ label.import-button {
   gap: 10px;
 }
 
-.contacts-form {
-  display: grid;
-  gap: 8px;
-  margin-bottom: 14px;
-  padding-bottom: 14px;
-  border-bottom: 1px solid var(--line);
-}
-
-.contacts-form h3 {
-  margin: 0;
-  font-size: 1rem;
-}
-
-.contact-row {
-  display: grid;
-  grid-template-columns: 86px minmax(0, 1fr);
-  align-items: center;
-  gap: 8px;
-}
-
-.contact-row label {
-  color: var(--muted);
-  font-size: 0.86rem;
-  font-weight: 900;
-}
-
-.contact-row.current label {
-  color: var(--teal-dark);
-}
-
 .reminder-item {
   display: grid;
   gap: 8px;
@@ -842,7 +810,6 @@ label.import-button {
 
   .detail-facts,
   .form-grid,
-  .contact-row,
   .login-grid,
   .comment-form {
     grid-template-columns: 1fr;
