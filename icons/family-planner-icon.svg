@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="Family Planner">
+  <rect width="1024" height="1024" rx="224" fill="#0f766e"/>
+  <circle cx="316" cy="312" r="92" fill="#ffffff" opacity="0.96"/>
+  <circle cx="708" cy="312" r="92" fill="#ffffff" opacity="0.96"/>
+  <circle cx="398" cy="572" r="82" fill="#ffffff" opacity="0.9"/>
+  <circle cx="626" cy="572" r="82" fill="#ffffff" opacity="0.9"/>
+  <path d="M250 774c38-102 126-154 262-154s224 52 262 154" fill="none" stroke="#ffffff" stroke-width="72" stroke-linecap="round"/>
+  <path d="M300 464h424" stroke="#f8fafc" stroke-width="56" stroke-linecap="round" opacity="0.7"/>
+  <path d="M352 240h320" stroke="#f8fafc" stroke-width="56" stroke-linecap="round" opacity="0.7"/>
+</svg>

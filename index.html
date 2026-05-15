@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Family Planner</title>
+    <meta name="theme-color" content="#0f766e" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Family Planner" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="icons/family-planner-icon.svg" />
+    <link rel="icon" href="icons/family-planner-icon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="styles.css" />
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js" defer></script>
+    <script src="app.js" defer></script>
+  </head>
+  <body>
+    <header class="app-header">
+      <div>
+        <p class="eyebrow">Family command center</p>
+        <h1>Family Planner</h1>
+      </div>
+      <div class="header-actions">
+        <button class="profile-button" id="currentProfileBtn" type="button"></button>
+        <button class="secondary-button" id="loginBtn" type="button">
+          <i data-lucide="user-round-cog"></i>
+          Switch
+        </button>
+        <button class="icon-button" id="exportBtn" type="button" title="Export backup" aria-label="Export backup">
+          <i data-lucide="download">↓</i>
+        </button>
+        <label class="icon-button import-button" title="Import backup" aria-label="Import backup">
+          <i data-lucide="upload">↑</i>
+          <input id="importInput" type="file" accept="application/json" />
+        </label>
+        <button class="primary-button" id="newTaskBtn" type="button">
+          <i data-lucide="plus"></i>
+          New task
+        </button>
+      </div>
+    </header>
+
+    <main class="app-shell">
+      <section class="member-strip" id="memberStrip" aria-label="Family members"></section>
+
+      <section class="dashboard-grid">
+        <section class="task-panel" aria-label="Task lists">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">Main page</p>
+              <h2>Tasks and asks</h2>
+            </div>
+            <div class="search-control">
+              <i data-lucide="search"></i>
+              <input id="searchInput" type="search" placeholder="Search" autocomplete="off" />
+            </div>
+          </div>
+
+          <nav class="segmented-control" id="statusTabs" aria-label="Task status filters"></nav>
+          <div class="task-list" id="taskList"></div>
+        </section>
+
+        <aside class="detail-panel" aria-label="Task details">
+          <div id="taskDetail" class="empty-detail">
+            <i data-lucide="list-checks"></i>
+            <h2>Select a task</h2>
+            <p>Pick one from the list.</p>
+          </div>
+        </aside>
+      </section>
+
+      <section class="lower-grid">
+        <section class="calendar-panel" aria-label="Calendar">
+          <div class="panel-heading compact">
+            <div>
+              <p class="eyebrow">Due dates</p>
+              <h2 id="monthLabel">Calendar</h2>
+            </div>
+            <div class="calendar-controls">
+              <button class="icon-button" id="prevMonthBtn" type="button" title="Previous month" aria-label="Previous month">
+                <i data-lucide="chevron-left">‹</i>
+              </button>
+              <button class="secondary-button" id="todayBtn" type="button">Today</button>
+              <button class="icon-button" id="nextMonthBtn" type="button" title="Next month" aria-label="Next month">
+                <i data-lucide="chevron-right">›</i>
+              </button>
+            </div>
+          </div>
+          <div class="calendar" id="calendarGrid"></div>
+        </section>
+
+        <section class="reminder-panel" aria-label="Email reminders">
+          <div class="panel-heading compact">
+            <div>
+              <p class="eyebrow">Progress</p>
+              <h2>Email reminders</h2>
+            </div>
+            <button class="secondary-button" id="emailDigestBtn" type="button">
+              <i data-lucide="mail"></i>
+              Digest
+            </button>
+          </div>
+          <form class="contacts-form" id="contactsForm" aria-label="Reminder contacts"></form>
+          <div class="reminder-list" id="reminderList"></div>
+        </section>
+      </section>
+    </main>
+
+    <dialog id="taskDialog" class="task-dialog">
+      <form id="taskForm" method="dialog">
+        <div class="dialog-heading">
+          <div>
+            <p class="eyebrow">Task intake</p>
+            <h2 id="dialogTitle">New task</h2>
+          </div>
+          <button class="icon-button" id="closeDialogBtn" value="cancel" type="button" title="Close" aria-label="Close">
+            <i data-lucide="x">×</i>
+          </button>
+        </div>
+
+        <input id="taskId" type="hidden" />
+
+        <label>
+          Title
+          <input id="taskTitle" name="title" required maxlength="90" placeholder="What needs attention?" />
+        </label>
+
+        <div class="form-grid">
+          <label>
+            Type
+            <select id="taskType" name="type">
+              <option value="todo">To do</option>
+              <option value="ask">Ask</option>
+              <option value="decision">Decision</option>
+              <option value="appointment">Appointment</option>
+            </select>
+          </label>
+
+          <label>
+            Status
+            <select id="taskStatus" name="status"></select>
+          </label>
+
+          <label>
+            Requested by
+            <select id="taskRequester" name="requester"></select>
+          </label>
+
+          <label>
+            Assigned to
+            <select id="taskAssignee" name="assignee"></select>
+          </label>
+
+          <label>
+            Due date
+            <input id="taskDueDate" name="dueDate" type="date" required />
+          </label>
+
+          <label>
+            Priority
+            <select id="taskPriority" name="priority">
+              <option value="normal">Normal</option>
+              <option value="high">High</option>
+              <option value="low">Low</option>
+            </select>
+          </label>
+        </div>
+
+        <label>
+          Requirements
+          <textarea id="taskDescription" name="description" rows="4" placeholder="Details, links, budget, constraints"></textarea>
+        </label>
+
+        <div class="dialog-actions">
+          <button class="secondary-button" id="deleteTaskBtn" type="button">
+            <i data-lucide="trash-2"></i>
+            Delete
+          </button>
+          <button class="primary-button" type="submit">
+            <i data-lucide="save"></i>
+            Save
+          </button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="loginDialog" class="task-dialog">
+      <form id="loginForm" method="dialog">
+        <div class="dialog-heading">
+          <div>
+            <p class="eyebrow">Profile login</p>
+            <h2>Choose profile</h2>
+          </div>
+          <button class="icon-button" id="closeLoginBtn" value="cancel" type="button" title="Close" aria-label="Close">
+            <i data-lucide="x">×</i>
+          </button>
+        </div>
+
+        <div class="login-grid" id="loginMemberGrid"></div>
+
+        <label>
+          PIN
+          <input id="loginPin" type="password" inputmode="numeric" autocomplete="current-password" placeholder="Only needed if set" />
+        </label>
+        <p class="form-error" id="loginError"></p>
+
+        <div class="dialog-actions">
+          <button class="secondary-button" id="cancelLoginBtn" type="button">Cancel</button>
+          <button class="primary-button" type="submit">
+            <i data-lucide="log-in"></i>
+            Login
+          </button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="profileDialog" class="task-dialog">
+      <form id="profileForm" method="dialog">
+        <div class="dialog-heading">
+          <div>
+            <p class="eyebrow">Profile settings</p>
+            <h2 id="profileTitle">My profile</h2>
+          </div>
+          <button class="icon-button" id="closeProfileBtn" value="cancel" type="button" title="Close" aria-label="Close">
+            <i data-lucide="x">×</i>
+          </button>
+        </div>
+
+        <div class="profile-editor">
+          <div class="profile-preview" id="profilePreview"></div>
+          <div class="form-grid">
+            <label>
+              Name
+              <input id="profileName" required maxlength="40" />
+            </label>
+
+            <label>
+              Age
+              <input id="profileAge" type="number" min="1" max="120" required />
+            </label>
+
+            <label>
+              Email
+              <input id="profileEmail" type="email" autocomplete="email" />
+            </label>
+
+            <label>
+              Color
+              <input id="profileColor" type="color" />
+            </label>
+
+            <label>
+              PIN
+              <input id="profilePin" type="password" inputmode="numeric" autocomplete="new-password" placeholder="Optional" />
+            </label>
+
+            <label>
+              Reminder days
+              <input id="profileReminderDays" type="number" min="1" max="30" />
+            </label>
+          </div>
+
+          <label class="checkbox-row">
+            <input id="profileDigest" type="checkbox" />
+            Include me in digest emails
+          </label>
+        </div>
+
+        <div class="dialog-actions">
+          <button class="secondary-button" id="cancelProfileBtn" type="button">Cancel</button>
+          <button class="primary-button" type="submit">
+            <i data-lucide="save"></i>
+            Save profile
+          </button>
+        </div>
+      </form>
+    </dialog>
+  </body>
+</html>
