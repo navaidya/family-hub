@@ -936,6 +936,28 @@ label.import-button {
   font-weight: 800;
 }
 
+.stop-edit-menu {
+  position: relative;
+}
+
+.stop-edit-menu summary {
+  cursor: pointer;
+  list-style: none;
+}
+
+.stop-edit-menu summary::-webkit-details-marker {
+  display: none;
+}
+
+.stop-edit-form {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 20;
+  width: min(720px, calc(100vw - 32px));
+  box-shadow: var(--shadow);
+}
+
 .trip-day-card {
   display: grid;
   gap: 12px;
@@ -2074,11 +2096,15 @@ label.import-button {
 
   .maps-import-menu,
   .maps-import-menu summary,
-  .maps-import-menu .maps-import-form {
+  .maps-import-menu .maps-import-form,
+  .stop-edit-menu,
+  .stop-edit-menu summary,
+  .stop-edit-menu .stop-edit-form {
     width: 100%;
   }
 
-  .maps-import-menu .maps-import-form {
+  .maps-import-menu .maps-import-form,
+  .stop-edit-menu .stop-edit-form {
     position: static;
     margin-top: 8px;
     box-shadow: none;

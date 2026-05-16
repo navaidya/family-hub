@@ -1404,6 +1404,9 @@ function renderTripDetail() {
   elements.tripDetail.querySelectorAll("[data-stop-form]").forEach((formElement) => {
     formElement.addEventListener("submit", addStopToDay);
   });
+  elements.tripDetail.querySelectorAll("[data-stop-edit-form]").forEach((formElement) => {
+    formElement.addEventListener("submit", updateTripStop);
+  });
   elements.tripDetail.querySelectorAll("[data-stop-move]").forEach((select) => {
     select.addEventListener("change", () => moveStopToDay(select.dataset.dayId, select.dataset.stopMove, select.value));
   });
@@ -1535,11 +1538,33 @@ function renderTripStop(trip, day, stop) {
           ${dayOptions}
         </select>
         ${stop.url ? `<a class="secondary-button" href="${escapeAttribute(stop.url)}" target="_blank" rel="noreferrer"><i data-lucide="external-link"></i>Link</a>` : ""}
+        <details class="stop-edit-menu">
+          <summary class="icon-button" title="Edit stop" aria-label="Edit stop"><i data-lucide="pencil"></i></summary>
+          ${renderStopEditForm(day, stop)}
+        </details>
         <button class="icon-button danger" type="button" data-day-id="${escapeAttribute(day.id)}" data-stop-delete="${escapeAttribute(stop.id)}" title="Delete stop" aria-label="Delete stop">
           <i data-lucide="trash-2"></i>
         </button>
       </div>
     </article>
+  `;
+}
+
+function renderStopEditForm(day, stop) {
+  return `
+    <form class="travel-form stop-edit-form" data-stop-edit-form data-day-id="${escapeAttribute(day.id)}" data-stop-id="${escapeAttribute(stop.id)}">
+      <select name="type">
+        ${["sightseeing", "food", "hotel", "drive", "other"]
+          .map((type) => `<option value="${type}" ${stop.type === type ? "selected" : ""}>${tripStopTypeLabel(type)}</option>`)
+          .join("")}
+      </select>
+      <input name="time" maxlength="20" placeholder="Time" value="${escapeAttribute(stop.time)}" />
+      <input name="name" required maxlength="90" placeholder="Place or activity" value="${escapeAttribute(stop.name)}" />
+      <input name="address" maxlength="160" placeholder="Address or map search text" value="${escapeAttribute(stop.address)}" />
+      <input name="url" type="url" placeholder="Website/menu link" value="${escapeAttribute(stop.url)}" />
+      <input name="notes" maxlength="240" placeholder="Notes, tickets, must order" value="${escapeAttribute(stop.notes)}" />
+      <button class="secondary-button" type="submit"><i data-lucide="save"></i>Save</button>
+    </form>
   `;
 }
 
@@ -1682,6 +1707,28 @@ function addStopToDay(event) {
     addedAt: new Date().toISOString(),
     source: "Manual add",
   });
+  day.stops.sort((a, b) => a.time.localeCompare(b.time));
+  trip.updatedAt = new Date().toISOString();
+  saveState();
+  renderTrips();
+}
+
+function updateTripStop(event) {
+  event.preventDefault();
+  const trip = getSelectedTrip();
+  const day = trip?.days.find((item) => item.id === event.currentTarget.dataset.dayId);
+  const stop = day?.stops.find((item) => item.id === event.currentTarget.dataset.stopId);
+  if (!trip || !day || !stop) return;
+
+  const data = new FormData(event.currentTarget);
+  stop.type = String(data.get("type") || "sightseeing");
+  stop.time = String(data.get("time") || "").trim();
+  stop.name = String(data.get("name") || "").trim();
+  stop.address = String(data.get("address") || "").trim();
+  stop.url = String(data.get("url") || "").trim();
+  stop.notes = String(data.get("notes") || "").trim();
+  stop.updatedBy = state.currentMemberId;
+  stop.updatedAt = new Date().toISOString();
   day.stops.sort((a, b) => a.time.localeCompare(b.time));
   trip.updatedAt = new Date().toISOString();
   saveState();
