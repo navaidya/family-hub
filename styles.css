@@ -781,6 +781,17 @@ label.import-button {
   background: #ffe3de;
 }
 
+.badge.repeat {
+  gap: 4px;
+  color: #0f5f58;
+  background: #dff4ea;
+}
+
+.badge.repeat svg {
+  width: 14px;
+  height: 14px;
+}
+
 .date-pill {
   display: inline-flex;
   align-items: center;
@@ -1204,6 +1215,16 @@ label.import-button {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+}
+
+.reminder-row > div:first-child {
+  min-width: 0;
+}
+
+.reminder-actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 6px;
 }
 
 .reminder-title {

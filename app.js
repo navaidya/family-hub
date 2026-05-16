@@ -47,6 +47,7 @@ const familyMembers = [
     name: "Naval",
     age: 46,
     email: "navalvaidya@gmail.com",
+    phone: "925-416-9453",
     color: "#0f766e",
     pin: "1980",
     settings: { reminderDays: 7, includeInDigest: true },
@@ -56,6 +57,7 @@ const familyMembers = [
     name: "Priyanka",
     age: 43,
     email: "priyanka.naval.vaidya@gmail.com",
+    phone: "925-319-7641",
     color: "#4754a3",
     pin: "1983",
     settings: { reminderDays: 7, includeInDigest: true },
@@ -65,6 +67,7 @@ const familyMembers = [
     name: "Vivan",
     age: 16,
     email: "vivaanvaidya@gmail.com",
+    phone: "925-319-8191",
     color: "#d95f43",
     pin: "2010",
     settings: { reminderDays: 5, includeInDigest: true },
@@ -74,6 +77,7 @@ const familyMembers = [
     name: "Yuvika",
     age: 9,
     email: "yuvikavaidya@gmail.com",
+    phone: "",
     color: "#237a57",
     pin: "2017",
     settings: { reminderDays: 3, includeInDigest: true },
@@ -166,6 +170,7 @@ const elements = {
   profileName: document.querySelector("#profileName"),
   profileAge: document.querySelector("#profileAge"),
   profileEmail: document.querySelector("#profileEmail"),
+  profilePhone: document.querySelector("#profilePhone"),
   profileColor: document.querySelector("#profileColor"),
   profilePin: document.querySelector("#profilePin"),
   profileReminderDays: document.querySelector("#profileReminderDays"),
@@ -203,6 +208,7 @@ const form = {
   requester: document.querySelector("#taskRequester"),
   assignee: document.querySelector("#taskAssignee"),
   dueDate: document.querySelector("#taskDueDate"),
+  recurrence: document.querySelector("#taskRecurrence"),
   priority: document.querySelector("#taskPriority"),
   description: document.querySelector("#taskDescription"),
 };
@@ -267,12 +273,14 @@ function normalizeMembers(savedMembers = []) {
     const shouldUseDefaultName = savedName === legacyNames[defaultMember.id];
     const savedEmail = saved.email ?? defaultMember.email;
     const shouldUseDefaultEmail = /@example\.com$/i.test(savedEmail);
+    const savedPhone = saved.phone ?? defaultMember.phone;
 
     return {
       ...defaultMember,
       ...saved,
       name: shouldUseDefaultName ? defaultMember.name : savedName,
       email: shouldUseDefaultEmail ? defaultMember.email : savedEmail,
+      phone: normalizePhone(savedPhone),
       pin: normalizePin(saved.pin || defaultMember.pin),
       settings: {
         ...defaultMember.settings,
@@ -285,6 +293,8 @@ function normalizeMembers(savedMembers = []) {
 function normalizeTasks(tasks = []) {
   return tasks.map((task) => ({
     ...task,
+    recurrence: ["none", "monthly"].includes(task.recurrence) ? task.recurrence : "none",
+    comments: Array.isArray(task.comments) ? task.comments : [],
     title:
       {
         "Review daughter's iPad ask": "Review Yuvika's iPad ask",
@@ -414,6 +424,10 @@ function normalizeWishComments(comments = []) {
 
 function normalizePin(pin) {
   return String(pin || "").trim();
+}
+
+function normalizePhone(phone) {
+  return String(phone || "").trim();
 }
 
 function seedTasks() {
@@ -1501,6 +1515,7 @@ function openProfileDialog() {
   elements.profileName.value = member.name;
   elements.profileAge.value = member.age;
   elements.profileEmail.value = member.email;
+  elements.profilePhone.value = member.phone || "";
   elements.profileColor.value = member.color;
   elements.profilePin.value = member.pin ?? "";
   elements.profileReminderDays.value = member.settings?.reminderDays ?? 7;
@@ -1530,6 +1545,7 @@ function saveProfileSettings(event) {
   member.name = elements.profileName.value.trim();
   member.age = Number(elements.profileAge.value);
   member.email = elements.profileEmail.value.trim();
+  member.phone = normalizePhone(elements.profilePhone.value);
   member.color = elements.profileColor.value;
   member.pin = normalizePin(elements.profilePin.value);
   member.settings = {
@@ -1666,6 +1682,7 @@ function renderTasks() {
             <span class="task-meta">
               <span class="badge ${task.type}">${taskTypeLabel(task.type)}</span>
               ${task.priority === "high" ? `<span class="badge high">High</span>` : ""}
+              ${task.recurrence === "monthly" ? `<span class="badge repeat"><i data-lucide="rotate-cw"></i>Monthly</span>` : ""}
               <span>${escapeHTML(memberName(task.requester))} asked</span>
               <span>${escapeHTML(assignee)}</span>
             </span>
@@ -1727,6 +1744,11 @@ function renderDetail() {
       <div class="detail-actions">
         <button class="secondary-button" type="button" data-action="edit"><i data-lucide="pencil"></i>Edit</button>
         <button class="secondary-button" type="button" data-action="email"><i data-lucide="mail"></i>Email</button>
+        ${
+          memberPhone(task.assignee || task.requester)
+            ? `<button class="secondary-button" type="button" data-action="sms"><i data-lucide="message-square"></i>Text</button>`
+            : ""
+        }
         <button class="chip-button" type="button" data-action="advance"><i data-lucide="${nextStatusIcon(task.status)}"></i>${nextStatusLabel(task.status)}</button>
       </div>
     </div>
@@ -1741,6 +1763,12 @@ function renderDetail() {
       <label class="fact inline-fact">
         <span>Due</span>
         <input class="inline-control" data-task-inline="dueDate" aria-label="Task due date" type="date" value="${escapeAttribute(task.dueDate)}" />
+      </label>
+      <label class="fact inline-fact">
+        <span>Repeat</span>
+        <select class="inline-control" data-task-inline="recurrence" aria-label="Task repeat">
+          ${renderRecurrenceOptions(task.recurrence)}
+        </select>
       </label>
       <label class="fact inline-fact">
         <span>Requested by</span>
@@ -1782,6 +1810,7 @@ function renderDetail() {
 
   elements.taskDetail.querySelector('[data-action="edit"]').addEventListener("click", () => openTaskDialog(task));
   elements.taskDetail.querySelector('[data-action="email"]').addEventListener("click", () => sendTaskEmail(task));
+  elements.taskDetail.querySelector('[data-action="sms"]')?.addEventListener("click", () => sendTaskSms(task));
   elements.taskDetail.querySelector('[data-action="advance"]').addEventListener("click", () => advanceTask(task.id));
   elements.taskDetail.querySelector("[data-comment-form]").addEventListener("submit", addComment);
   elements.taskDetail.querySelectorAll("[data-task-inline]").forEach((control) => {
@@ -1803,21 +1832,33 @@ function renderMemberOptions(selectedMemberId) {
     .join("");
 }
 
+function renderRecurrenceOptions(selectedRecurrence = "none") {
+  return [
+    { id: "none", label: "Does not repeat" },
+    { id: "monthly", label: "Monthly" },
+  ]
+    .map((item) => `<option value="${item.id}" ${item.id === selectedRecurrence ? "selected" : ""}>${item.label}</option>`)
+    .join("");
+}
+
 function updateTaskInlineField(event) {
   const task = getSelectedTask();
   if (!task) return;
 
   const field = event.currentTarget.dataset.taskInline;
   const value = event.currentTarget.value;
-  if (!["status", "dueDate", "requester", "assignee"].includes(field)) return;
+  if (!["status", "dueDate", "requester", "assignee", "recurrence"].includes(field)) return;
   if (field === "dueDate" && !value) {
     event.currentTarget.value = task.dueDate;
     return;
   }
   if (task[field] === value) return;
 
+  const previousStatus = task.status;
   task[field] = value;
+  if (field === "status" && value === "assigned" && !task.assignee) task.assignee = task.requester;
   task.updatedAt = new Date().toISOString();
+  if (field === "status") createNextRecurringTask(task, previousStatus);
   saveState();
   renderStatusTabs();
   renderTasks();
@@ -1940,6 +1981,7 @@ function renderReminders() {
   elements.reminderList.innerHTML = tasks
     .map((task) => {
       const owner = task.assignee || task.requester;
+      const ownerProfile = getMember(owner);
       return `
         <article class="reminder-item">
           <div class="reminder-row">
@@ -1947,9 +1989,22 @@ function renderReminders() {
               <div class="reminder-title">${escapeHTML(task.title)}</div>
               <div class="reminder-meta">${formatDuePhrase(task.dueDate)} · ${escapeHTML(memberName(owner))}</div>
             </div>
-            <button class="icon-button" type="button" data-email-task="${task.id}" title="Email reminder" aria-label="Email reminder">
-              <i data-lucide="mail">@</i>
-            </button>
+            <div class="reminder-actions">
+              ${
+                ownerProfile?.email
+                  ? `<button class="icon-button" type="button" data-email-task="${task.id}" title="Email reminder" aria-label="Email reminder">
+                      <i data-lucide="mail">@</i>
+                    </button>`
+                  : ""
+              }
+              ${
+                ownerProfile?.phone
+                  ? `<button class="icon-button" type="button" data-sms-task="${task.id}" title="Text reminder" aria-label="Text reminder">
+                      <i data-lucide="message-square"></i>
+                    </button>`
+                  : ""
+              }
+            </div>
           </div>
         </article>
       `;
@@ -1960,6 +2015,13 @@ function renderReminders() {
     button.addEventListener("click", () => {
       const task = state.tasks.find((item) => item.id === button.dataset.emailTask);
       if (task) sendTaskEmail(task);
+    });
+  });
+
+  elements.reminderList.querySelectorAll("[data-sms-task]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const task = state.tasks.find((item) => item.id === button.dataset.smsTask);
+      if (task) sendTaskSms(task);
     });
   });
 
@@ -2357,6 +2419,7 @@ function buildTaskFromDraft(draft, now) {
     requester: state.currentMemberId,
     assignee: draft.assignee,
     dueDate: draft.dueDate,
+    recurrence: inferRecurrence(draft.original),
     priority: "normal",
     description: `Created by Family Hub Assistant from rough list:\n\n${draft.original}`,
     comments: [
@@ -2382,6 +2445,7 @@ function buildTaskFromNote(note, member, question) {
     requester: member.id,
     assignee: "",
     dueDate: deriveDueDateFromQuestion(question),
+    recurrence: inferRecurrence(question),
     priority: "normal",
     description: `Created from ${member.name}'s notebook note:\n\n${note.text}`,
     comments: [
@@ -2411,6 +2475,10 @@ function deriveDueDateFromQuestion(text) {
   const parsed = parseDueDateText(text);
   if (parsed) return parsed.dueDate;
   return addDays(isoToday, 7);
+}
+
+function inferRecurrence(text) {
+  return /\b(monthly|every\s+month|recurring|repeat(?:s|ing)?)\b/i.test(String(text || "")) ? "monthly" : "none";
 }
 
 function extractDueDateFromLine(line) {
@@ -2707,6 +2775,7 @@ function openTaskDialog(task = null) {
   form.requester.value = task?.requester ?? state.currentMemberId;
   form.assignee.value = task?.assignee ?? "";
   form.dueDate.value = task?.dueDate ?? isoToday;
+  form.recurrence.value = task?.recurrence ?? "none";
   form.priority.value = task?.priority ?? "normal";
   form.description.value = task?.description ?? "";
 
@@ -2871,6 +2940,7 @@ function saveTaskFromForm(event) {
     requester: form.requester.value,
     assignee: form.assignee.value,
     dueDate: form.dueDate.value,
+    recurrence: form.recurrence.value,
     priority: form.priority.value,
     description: form.description.value.trim(),
     comments: existing?.comments ?? [],
@@ -2959,6 +3029,7 @@ function makeTaskFromWish(wishId) {
     requester: wish.owner,
     assignee: "",
     dueDate: wish.targetDate || addDays(isoToday, 7),
+    recurrence: "none",
     priority: "normal",
     description: `Created from Wishlist.\n\nCategory: ${wishCategoryLabel(wish.category)}\nWish details:\n${wish.details || "No details added."}`,
     comments: [
@@ -2997,12 +3068,44 @@ function advanceTask(id) {
   if (!task) return;
 
   const order = ["todo", "discussion", "assigned", "done"];
+  const previousStatus = task.status;
   const next = order[Math.min(order.indexOf(task.status) + 1, order.length - 1)];
   task.status = next;
   if (next === "assigned" && !task.assignee) task.assignee = task.requester;
   task.updatedAt = new Date().toISOString();
+  createNextRecurringTask(task, previousStatus);
   saveState();
   render();
+}
+
+function createNextRecurringTask(task, previousStatus) {
+  if (previousStatus === "done" || task.status !== "done" || task.recurrence !== "monthly" || !task.dueDate) return null;
+
+  const nextDueDate = addMonths(task.dueDate, 1);
+  const alreadyCreated = state.tasks.some((item) => item.parentTaskId === task.id && item.dueDate === nextDueDate);
+  if (alreadyCreated) return null;
+
+  const now = new Date().toISOString();
+  const nextTask = {
+    ...task,
+    id: crypto.randomUUID(),
+    status: "todo",
+    dueDate: nextDueDate,
+    comments: [
+      {
+        id: crypto.randomUUID(),
+        author: state.currentMemberId,
+        createdAt: now,
+        text: `Created from the monthly recurring task due ${formatLongDate(task.dueDate)}.`,
+      },
+    ],
+    parentTaskId: task.id,
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  state.tasks.unshift(nextTask);
+  return nextTask;
 }
 
 function sendTaskEmail(task) {
@@ -3013,7 +3116,28 @@ function sendTaskEmail(task) {
   }
 
   const subject = `Family Hub: ${task.title}`;
+  openMail(recipient, subject, taskReminderBody(task));
+}
+
+function sendTaskSms(task) {
+  const recipient = memberPhone(task.assignee || task.requester);
+  if (!recipient) {
+    window.alert("Add a phone number in that member's profile first.");
+    return;
+  }
+
   const body = [
+    `Family Hub reminder: ${task.title}`,
+    `Due: ${formatLongDate(task.dueDate)}`,
+    `Status: ${statusLabel(task.status)}`,
+    `Owner: ${task.assignee ? memberName(task.assignee) : memberName(task.requester)}`,
+  ].join("\n");
+
+  openSms(recipient, body);
+}
+
+function taskReminderBody(task) {
+  return [
     `Task: ${task.title}`,
     `Status: ${statusLabel(task.status)}`,
     `Due: ${formatLongDate(task.dueDate)}`,
@@ -3026,8 +3150,6 @@ function sendTaskEmail(task) {
     "Latest conversation:",
     task.comments.at(-1)?.text || "No discussion yet.",
   ].join("\n");
-
-  openMail(recipient, subject, body);
 }
 
 function sendDigestEmail() {
@@ -3244,6 +3366,14 @@ function addDays(dateString, amount) {
   return toISODate(date);
 }
 
+function addMonths(dateString, amount) {
+  const date = parseLocalDate(dateString);
+  const target = new Date(date.getFullYear(), date.getMonth() + amount, 1);
+  const lastDay = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();
+  target.setDate(Math.min(date.getDate(), lastDay));
+  return toISODate(target);
+}
+
 function formatShortDate(dateString) {
   return parseLocalDate(dateString).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
@@ -3308,6 +3438,10 @@ function memberName(id) {
 
 function memberEmail(id) {
   return getMember(id)?.email ?? "";
+}
+
+function memberPhone(id) {
+  return getMember(id)?.phone ?? "";
 }
 
 function syncStatusSummary() {
@@ -3454,6 +3588,13 @@ function openMail(to, subject, body) {
     .join(",");
   const params = new URLSearchParams({ subject, body });
   window.location.href = `mailto:${recipients}?${params.toString()}`;
+}
+
+function openSms(to, body) {
+  const recipient = to.replace(/[^\d+]/g, "");
+  if (!recipient) return;
+  const separator = /iPad|iPhone|iPod|Macintosh/i.test(navigator.userAgent) ? "&" : "?";
+  window.location.href = `sms:${recipient}${separator}body=${encodeURIComponent(body)}`;
 }
 
 function escapeHTML(value) {

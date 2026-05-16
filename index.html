@@ -251,6 +251,14 @@
           </label>
 
           <label>
+            Repeat
+            <select id="taskRecurrence" name="recurrence">
+              <option value="none">Does not repeat</option>
+              <option value="monthly">Monthly</option>
+            </select>
+          </label>
+
+          <label>
             Priority
             <select id="taskPriority" name="priority">
               <option value="normal">Normal</option>
@@ -449,6 +457,11 @@
             <label>
               Email
               <input id="profileEmail" type="email" autocomplete="email" />
+            </label>
+
+            <label>
+              Phone
+              <input id="profilePhone" type="tel" autocomplete="tel" placeholder="925-416-9453" />
             </label>
 
             <label>
