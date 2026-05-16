@@ -66,6 +66,7 @@ let selectedTaskId = state.tasks[0]?.id ?? null;
 let visibleMonth = new Date(today.getFullYear(), today.getMonth(), 1);
 let pendingLoginMemberId = state.currentMemberId;
 let cloudState = createCloudState();
+let hasPromptedForCloudLogin = false;
 
 const elements = {
   cloudStatusBtn: document.querySelector("#cloudStatusBtn"),
@@ -410,6 +411,7 @@ function initCloudSync() {
 
       renderCloudStatus();
       renderCloudDialog();
+      promptForCloudLoginIfNeeded();
     });
   } catch (error) {
     cloudState.error = error.message || "Firebase could not start.";
@@ -529,6 +531,14 @@ function openCloudDialog() {
     elements.cloudEmail.focus();
   }
   refreshIcons();
+}
+
+function promptForCloudLoginIfNeeded() {
+  if (hasPromptedForCloudLogin || !cloudState.configured || cloudState.user) return;
+  if (!elements.cloudDialog || elements.cloudDialog.open) return;
+
+  hasPromptedForCloudLogin = true;
+  window.setTimeout(() => openCloudDialog(), 350);
 }
 
 function renderCloudDialog() {
