@@ -1,5 +1,6 @@
 const STORAGE_KEY = "family-hub-state-v1";
 const LEGACY_STORAGE_KEY = "family-planner-state-v1";
+const LOCAL_PROFILE_KEY = "family-hub-local-profile-v1";
 
 const statuses = [
   { id: "all", label: "All" },
@@ -63,8 +64,10 @@ let activeStatus = "all";
 let selectedTaskId = state.tasks[0]?.id ?? null;
 let visibleMonth = new Date(today.getFullYear(), today.getMonth(), 1);
 let pendingLoginMemberId = state.currentMemberId;
+let cloudState = createCloudState();
 
 const elements = {
+  cloudStatusBtn: document.querySelector("#cloudStatusBtn"),
   currentProfileBtn: document.querySelector("#currentProfileBtn"),
   loginBtn: document.querySelector("#loginBtn"),
   memberStrip: document.querySelector("#memberStrip"),
@@ -107,6 +110,15 @@ const elements = {
   profileDigest: document.querySelector("#profileDigest"),
   closeProfileBtn: document.querySelector("#closeProfileBtn"),
   cancelProfileBtn: document.querySelector("#cancelProfileBtn"),
+  cloudDialog: document.querySelector("#cloudDialog"),
+  cloudForm: document.querySelector("#cloudForm"),
+  cloudSummary: document.querySelector("#cloudSummary"),
+  cloudEmail: document.querySelector("#cloudEmail"),
+  cloudPassword: document.querySelector("#cloudPassword"),
+  cloudError: document.querySelector("#cloudError"),
+  closeCloudBtn: document.querySelector("#closeCloudBtn"),
+  cloudSignOutBtn: document.querySelector("#cloudSignOutBtn"),
+  cloudSignUpBtn: document.querySelector("#cloudSignUpBtn"),
 };
 
 const form = {
@@ -125,6 +137,7 @@ render();
 bindEvents();
 registerServiceWorker();
 handleLaunchAction();
+initCloudSync();
 
 function loadState() {
   const saved = localStorage.getItem(STORAGE_KEY) || localStorage.getItem(LEGACY_STORAGE_KEY);
@@ -134,7 +147,7 @@ function loadState() {
       return {
         members: normalizeMembers(parsed.members),
         tasks: normalizeTasks(parsed.tasks?.length ? parsed.tasks : seedTasks()),
-        currentMemberId: parsed.currentMemberId || "me",
+        currentMemberId: localStorage.getItem(LOCAL_PROFILE_KEY) || parsed.currentMemberId || "me",
       };
     } catch (error) {
       console.warn("Could not parse planner data", error);
@@ -144,7 +157,7 @@ function loadState() {
   return {
     members: normalizeMembers(),
     tasks: normalizeTasks(seedTasks()),
-    currentMemberId: "me",
+    currentMemberId: localStorage.getItem(LOCAL_PROFILE_KEY) || "me",
   };
 }
 
@@ -238,6 +251,7 @@ function seedTasks() {
 }
 
 function bindEvents() {
+  elements.cloudStatusBtn.addEventListener("click", openCloudDialog);
   elements.currentProfileBtn.addEventListener("click", openProfileDialog);
   elements.loginBtn.addEventListener("click", () => openLoginDialog());
   elements.newTaskBtn.addEventListener("click", () => openTaskDialog());
@@ -275,6 +289,14 @@ function bindEvents() {
 
   elements.profileName.addEventListener("input", renderProfilePreview);
   elements.profileColor.addEventListener("input", renderProfilePreview);
+
+  elements.cloudForm.addEventListener("submit", signInToCloud);
+  elements.closeCloudBtn.addEventListener("click", closeCloudDialog);
+  elements.cloudSignUpBtn.addEventListener("click", createCloudLogin);
+  elements.cloudSignOutBtn.addEventListener("click", signOutOfCloud);
+  elements.cloudDialog.addEventListener("click", (event) => {
+    if (event.target === elements.cloudDialog) closeCloudDialog();
+  });
 }
 
 function registerServiceWorker() {
@@ -295,7 +317,256 @@ function handleLaunchAction() {
   }
 }
 
+function createCloudState() {
+  return {
+    configured: false,
+    enabled: false,
+    user: null,
+    auth: null,
+    db: null,
+    familyRef: null,
+    unsubscribe: null,
+    applyingRemote: false,
+    saveTimer: null,
+    error: "",
+  };
+}
+
+function initCloudSync() {
+  cloudState.configured = isFirebaseConfigured();
+  if (!cloudState.configured) {
+    renderCloudStatus();
+    return;
+  }
+
+  try {
+    const config = window.FAMILY_HUB_FIREBASE_CONFIG;
+    if (!firebase.apps.length) {
+      firebase.initializeApp(config);
+    }
+
+    cloudState.auth = firebase.auth();
+    cloudState.db = firebase.firestore();
+    cloudState.enabled = true;
+
+    cloudState.auth.onAuthStateChanged((user) => {
+      cloudState.user = user;
+      cloudState.error = "";
+      if (cloudState.unsubscribe) {
+        cloudState.unsubscribe();
+        cloudState.unsubscribe = null;
+      }
+
+      if (user) {
+        subscribeToFamilyDoc();
+      }
+
+      renderCloudStatus();
+      renderCloudDialog();
+    });
+  } catch (error) {
+    cloudState.error = error.message || "Firebase could not start.";
+    renderCloudStatus();
+  }
+}
+
+function isFirebaseConfigured() {
+  const config = window.FAMILY_HUB_FIREBASE_CONFIG;
+  return Boolean(
+    window.firebase &&
+      config &&
+      config.apiKey &&
+      config.projectId &&
+      config.appId,
+  );
+}
+
+function subscribeToFamilyDoc() {
+  const familyId = window.FAMILY_HUB_FIREBASE_OPTIONS?.familyId || "default-family";
+  cloudState.familyRef = cloudState.db.collection("families").doc(familyId);
+  cloudState.unsubscribe = cloudState.familyRef.onSnapshot(
+    (snapshot) => {
+      if (!snapshot.exists) {
+        saveCloudState(true);
+        return;
+      }
+
+      const data = snapshot.data();
+      applyRemoteFamilyData(data);
+    },
+    (error) => {
+      cloudState.error = error.message || "Could not read shared family data.";
+      renderCloudStatus();
+      renderCloudDialog();
+    },
+  );
+}
+
+function applyRemoteFamilyData(data = {}) {
+  cloudState.applyingRemote = true;
+  state = {
+    members: normalizeMembers(data.members),
+    tasks: normalizeTasks(data.tasks?.length ? data.tasks : []),
+    currentMemberId: localStorage.getItem(LOCAL_PROFILE_KEY) || state.currentMemberId || "me",
+  };
+
+  if (!getMember(state.currentMemberId)) {
+    state.currentMemberId = state.members[0]?.id || "me";
+  }
+
+  if (!state.tasks.some((task) => task.id === selectedTaskId)) {
+    selectedTaskId = state.tasks[0]?.id ?? null;
+  }
+
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  localStorage.setItem(LOCAL_PROFILE_KEY, state.currentMemberId);
+  cloudState.applyingRemote = false;
+  render();
+}
+
+function queueCloudSave() {
+  if (cloudState.applyingRemote || !cloudState.enabled || !cloudState.user || !cloudState.familyRef) return;
+
+  window.clearTimeout(cloudState.saveTimer);
+  cloudState.saveTimer = window.setTimeout(() => saveCloudState(), 250);
+}
+
+function saveCloudState(force = false) {
+  if ((!force && cloudState.applyingRemote) || !cloudState.enabled || !cloudState.user || !cloudState.familyRef) return;
+
+  const payload = {
+    members: state.members,
+    tasks: state.tasks,
+    updatedBy: cloudState.user.email || cloudState.user.uid,
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+  };
+
+  cloudState.familyRef.set(payload, { merge: true }).catch((error) => {
+    cloudState.error = error.message || "Could not save shared family data.";
+    renderCloudStatus();
+    renderCloudDialog();
+  });
+}
+
+function renderCloudStatus() {
+  if (!elements.cloudStatusBtn) return;
+
+  if (!cloudState.configured) {
+    elements.cloudStatusBtn.className = "cloud-button warning";
+    elements.cloudStatusBtn.innerHTML = `<i data-lucide="cloud-off"></i> Local`;
+    refreshIcons();
+    return;
+  }
+
+  if (cloudState.user) {
+    elements.cloudStatusBtn.className = "cloud-button connected";
+    elements.cloudStatusBtn.innerHTML = `<i data-lucide="cloud"></i> Synced`;
+  } else {
+    elements.cloudStatusBtn.className = "cloud-button";
+    elements.cloudStatusBtn.innerHTML = `<i data-lucide="cloud"></i> Sign in`;
+  }
+  refreshIcons();
+}
+
+function openCloudDialog() {
+  elements.cloudError.textContent = "";
+  elements.cloudPassword.value = "";
+  if (cloudState.user?.email) {
+    elements.cloudEmail.value = cloudState.user.email;
+  }
+  renderCloudDialog();
+  elements.cloudDialog.showModal();
+  if (!cloudState.user) {
+    elements.cloudEmail.focus();
+  }
+  refreshIcons();
+}
+
+function renderCloudDialog() {
+  if (!elements.cloudSummary) return;
+
+  const familyId = window.FAMILY_HUB_FIREBASE_OPTIONS?.familyId || "default-family";
+  if (!cloudState.configured) {
+    elements.cloudSummary.innerHTML = `
+      <strong>Local mode</strong>
+      <span>Add your Firebase project values in <code>firebase-config.js</code>, then enable Email/Password sign-in in Firebase.</span>
+    `;
+    elements.cloudSignOutBtn.disabled = true;
+    return;
+  }
+
+  if (cloudState.user) {
+    elements.cloudSummary.innerHTML = `
+      <strong>Synced as ${escapeHTML(cloudState.user.email || "Firebase user")}</strong>
+      <span>Family data: ${escapeHTML(familyId)}</span>
+    `;
+    elements.cloudSignOutBtn.disabled = false;
+    return;
+  }
+
+  elements.cloudSummary.innerHTML = `
+    <strong>Cloud sync ready</strong>
+    <span>Sign in or create a login to share tasks through Firestore.</span>
+  `;
+  elements.cloudSignOutBtn.disabled = true;
+}
+
+function closeCloudDialog() {
+  elements.cloudDialog.close();
+  elements.cloudForm.reset();
+  elements.cloudError.textContent = "";
+}
+
+function signInToCloud(event) {
+  event.preventDefault();
+  if (!cloudState.configured) {
+    elements.cloudError.textContent = "Add Firebase config first.";
+    return;
+  }
+
+  cloudState.auth
+    .signInWithEmailAndPassword(elements.cloudEmail.value.trim(), elements.cloudPassword.value)
+    .then(() => closeCloudDialog())
+    .catch((error) => {
+      elements.cloudError.textContent = firebaseErrorMessage(error);
+    });
+}
+
+function createCloudLogin() {
+  if (!cloudState.configured) {
+    elements.cloudError.textContent = "Add Firebase config first.";
+    return;
+  }
+
+  cloudState.auth
+    .createUserWithEmailAndPassword(elements.cloudEmail.value.trim(), elements.cloudPassword.value)
+    .then(() => closeCloudDialog())
+    .catch((error) => {
+      elements.cloudError.textContent = firebaseErrorMessage(error);
+    });
+}
+
+function signOutOfCloud() {
+  if (!cloudState.auth) return;
+  cloudState.auth.signOut().then(() => {
+    closeCloudDialog();
+    renderCloudStatus();
+  });
+}
+
+function firebaseErrorMessage(error) {
+  const code = error?.code || "";
+  if (code.includes("invalid-email")) return "Enter a valid email address.";
+  if (code.includes("weak-password")) return "Use a password with at least 6 characters.";
+  if (code.includes("email-already-in-use")) return "That email already has a login.";
+  if (code.includes("user-not-found") || code.includes("wrong-password") || code.includes("invalid-credential")) {
+    return "Email or password did not match.";
+  }
+  return error?.message || "Firebase sign-in failed.";
+}
+
 function render() {
+  renderCloudStatus();
   renderCurrentProfile();
   renderMemberStrip();
   renderStatusTabs();
@@ -309,7 +580,9 @@ function render() {
 
 function saveState() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  localStorage.setItem(LOCAL_PROFILE_KEY, state.currentMemberId);
   localStorage.removeItem(LEGACY_STORAGE_KEY);
+  queueCloudSave();
 }
 
 function renderCurrentProfile() {

@@ -1,0 +1,19 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isFamilyMember() {
+      return request.auth != null
+        && request.auth.token.email in [
+          "naval@example.com",
+          "priyanka@example.com",
+          "vivan@example.com",
+          "yuvika@example.com"
+        ];
+    }
+
+    match /families/default-family {
+      allow read, write: if isFamilyMember();
+    }
+  }
+}

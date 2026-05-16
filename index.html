@@ -13,6 +13,10 @@
     <link rel="icon" href="icons/family-hub-icon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="styles.css" />
     <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js" defer></script>
+    <script src="firebase-config.js" defer></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js" defer></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js" defer></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js" defer></script>
     <script src="app.js" defer></script>
   </head>
   <body>
@@ -22,6 +26,10 @@
         <h1>Family Hub</h1>
       </div>
       <div class="header-actions">
+        <button class="cloud-button" id="cloudStatusBtn" type="button">
+          <i data-lucide="cloud-off"></i>
+          Local
+        </button>
         <button class="profile-button" id="currentProfileBtn" type="button"></button>
         <button class="secondary-button" id="loginBtn" type="button">
           <i data-lucide="user-round-cog"></i>
@@ -271,6 +279,49 @@
           <button class="primary-button" type="submit">
             <i data-lucide="save"></i>
             Save profile
+          </button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="cloudDialog" class="task-dialog">
+      <form id="cloudForm" method="dialog">
+        <div class="dialog-heading">
+          <div>
+            <p class="eyebrow">Shared family data</p>
+            <h2>Firebase sync</h2>
+          </div>
+          <button class="icon-button" id="closeCloudBtn" value="cancel" type="button" title="Close" aria-label="Close">
+            <i data-lucide="x">×</i>
+          </button>
+        </div>
+
+        <div class="cloud-summary" id="cloudSummary"></div>
+
+        <label>
+          Email
+          <input id="cloudEmail" type="email" autocomplete="email" placeholder="name@example.com" />
+        </label>
+
+        <label>
+          Password
+          <input id="cloudPassword" type="password" autocomplete="current-password" placeholder="At least 6 characters" />
+        </label>
+
+        <p class="form-error" id="cloudError"></p>
+
+        <div class="dialog-actions">
+          <button class="secondary-button" id="cloudSignOutBtn" type="button">
+            <i data-lucide="log-out"></i>
+            Sign out
+          </button>
+          <button class="secondary-button" id="cloudSignUpBtn" type="button">
+            <i data-lucide="user-plus"></i>
+            Create login
+          </button>
+          <button class="primary-button" type="submit">
+            <i data-lucide="cloud"></i>
+            Sign in
           </button>
         </div>
       </form>
