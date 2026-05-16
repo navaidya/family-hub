@@ -17,6 +17,8 @@
     <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js" defer></script>
     <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js" defer></script>
     <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js" defer></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js" defer></script>
     <script src="app.js" defer></script>
   </head>
   <body class="auth-loading">
@@ -93,6 +95,69 @@
         <div class="travel-grid">
           <div class="trip-list" id="tripList"></div>
           <div class="trip-detail" id="tripDetail"></div>
+        </div>
+      </section>
+
+      <section class="finance-panel tab-view" id="financeView" aria-label="Finance budgeting">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">Budgeting</p>
+            <h2>Finance</h2>
+          </div>
+          <button class="primary-button" id="financeUploadBtn" type="button">
+            <i data-lucide="receipt-text"></i>
+            Add bills
+          </button>
+        </div>
+
+        <input id="financeFileInput" class="hidden-file-input" type="file" multiple accept="image/*,.pdf,.txt,.csv" />
+
+        <div class="finance-grid">
+          <section class="finance-summary">
+            <div>
+              <p class="eyebrow">Monthly expense</p>
+              <strong id="financeMonthlyTotal">$0.00</strong>
+              <span id="financeMonthSummary">No expenses this month.</span>
+            </div>
+          </section>
+
+          <section class="finance-drop-zone" id="financeDropZone">
+            <i data-lucide="upload-cloud"></i>
+            <div>
+              <h3>Drop receipts, bills, or screenshots</h3>
+              <p>Images use OCR. PDFs and text files are scanned for dates and amounts. Review extracted rows below.</p>
+            </div>
+          </section>
+
+          <section class="finance-calendar-panel">
+            <div class="panel-heading compact">
+              <div>
+                <p class="eyebrow">Finance calendar</p>
+                <h2 id="financeMonthLabel">Calendar</h2>
+              </div>
+              <div class="calendar-controls">
+                <button class="icon-button" id="financePrevMonthBtn" type="button" title="Previous finance month" aria-label="Previous finance month">
+                  <i data-lucide="chevron-left">‹</i>
+                </button>
+                <button class="secondary-button" id="financeThisMonthBtn" type="button">This month</button>
+                <button class="icon-button" id="financeNextMonthBtn" type="button" title="Next finance month" aria-label="Next finance month">
+                  <i data-lucide="chevron-right">›</i>
+                </button>
+              </div>
+            </div>
+            <div class="calendar finance-calendar" id="financeCalendarGrid"></div>
+          </section>
+
+          <section class="finance-expense-panel">
+            <div class="panel-heading compact">
+              <div>
+                <p class="eyebrow">Extracted bills</p>
+                <h2>Expenses</h2>
+              </div>
+            </div>
+            <p class="form-error" id="financeProcessStatus"></p>
+            <div class="finance-expense-list" id="financeExpenseList"></div>
+          </section>
         </div>
       </section>
 

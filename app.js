@@ -39,6 +39,7 @@ const mainViews = [
   { id: "tasks", label: "Tasks", icon: "list-checks" },
   { id: "wishlist", label: "Wishlist", icon: "sparkles" },
   { id: "vacation", label: "Vacation", icon: "map" },
+  { id: "finance", label: "Finance", icon: "wallet-cards" },
 ];
 
 const familyMembers = [
@@ -102,6 +103,7 @@ let selectedTaskId = state.tasks[0]?.id ?? null;
 let selectedTripId = state.trips?.[0]?.id ?? null;
 let selectedWishId = state.wishes?.[0]?.id ?? null;
 let visibleMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+let visibleFinanceMonth = new Date(today.getFullYear(), today.getMonth(), 1);
 let pendingLoginMemberId = state.currentMemberId;
 let cloudState = createCloudState();
 
@@ -116,6 +118,7 @@ const elements = {
   taskView: document.querySelector("#taskView"),
   wishlistView: document.querySelector("#wishlistView"),
   vacationView: document.querySelector("#vacationView"),
+  financeView: document.querySelector("#financeView"),
   newWishBtn: document.querySelector("#newWishBtn"),
   wishTabs: document.querySelector("#wishTabs"),
   wishList: document.querySelector("#wishList"),
@@ -123,6 +126,18 @@ const elements = {
   newTripBtn: document.querySelector("#newTripBtn"),
   tripList: document.querySelector("#tripList"),
   tripDetail: document.querySelector("#tripDetail"),
+  financeUploadBtn: document.querySelector("#financeUploadBtn"),
+  financeFileInput: document.querySelector("#financeFileInput"),
+  financeDropZone: document.querySelector("#financeDropZone"),
+  financeMonthlyTotal: document.querySelector("#financeMonthlyTotal"),
+  financeMonthSummary: document.querySelector("#financeMonthSummary"),
+  financeMonthLabel: document.querySelector("#financeMonthLabel"),
+  financePrevMonthBtn: document.querySelector("#financePrevMonthBtn"),
+  financeThisMonthBtn: document.querySelector("#financeThisMonthBtn"),
+  financeNextMonthBtn: document.querySelector("#financeNextMonthBtn"),
+  financeCalendarGrid: document.querySelector("#financeCalendarGrid"),
+  financeProcessStatus: document.querySelector("#financeProcessStatus"),
+  financeExpenseList: document.querySelector("#financeExpenseList"),
   statusTabs: document.querySelector("#statusTabs"),
   taskList: document.querySelector("#taskList"),
   taskDetail: document.querySelector("#taskDetail"),
@@ -249,6 +264,7 @@ function loadState() {
         notes: normalizeNotes(parsed.notes),
         trips: normalizeTrips(parsed.trips),
         wishes: normalizeWishes(parsed.wishes),
+        expenses: normalizeExpenses(parsed.expenses),
         currentMemberId: localStorage.getItem(LOCAL_PROFILE_KEY) || parsed.currentMemberId || "me",
       };
     } catch (error) {
@@ -262,6 +278,7 @@ function loadState() {
     notes: normalizeNotes(),
     trips: normalizeTrips(),
     wishes: normalizeWishes(),
+    expenses: normalizeExpenses(),
     currentMemberId: localStorage.getItem(LOCAL_PROFILE_KEY) || "me",
   };
 }
@@ -409,6 +426,33 @@ function normalizeWishes(wishes = []) {
     });
 }
 
+function normalizeExpenses(expenses = []) {
+  if (!Array.isArray(expenses)) return [];
+
+  return expenses
+    .filter((expense) => expense && typeof expense === "object")
+    .map((expense) => ({
+      id: expense.id || crypto.randomUUID(),
+      title: String(expense.title || "Expense").trim(),
+      merchant: String(expense.merchant || expense.title || "Expense").trim(),
+      date: expense.date || isoToday,
+      amount: normalizeExpenseAmount(expense.amount),
+      category: String(expense.category || "Bills").trim(),
+      sourceName: String(expense.sourceName || "Uploaded bill").trim(),
+      sourceType: String(expense.sourceType || "upload").trim(),
+      textSnippet: String(expense.textSnippet || "").trim().slice(0, 260),
+      addedBy: getKnownMemberId(expense.addedBy) || "me",
+      createdAt: expense.createdAt || new Date().toISOString(),
+      updatedAt: expense.updatedAt || expense.createdAt || new Date().toISOString(),
+    }))
+    .filter((expense) => expense.title && expense.date && expense.amount > 0)
+    .sort((a, b) => {
+      const dateDiff = b.date.localeCompare(a.date);
+      if (dateDiff !== 0) return dateDiff;
+      return b.updatedAt.localeCompare(a.updatedAt);
+    });
+}
+
 function normalizeWishComments(comments = []) {
   if (!Array.isArray(comments)) return [];
   return comments
@@ -428,6 +472,12 @@ function normalizePin(pin) {
 
 function normalizePhone(phone) {
   return String(phone || "").trim();
+}
+
+function normalizeExpenseAmount(amount) {
+  const numeric = typeof amount === "number" ? amount : Number(String(amount || "").replace(/[$,\s]/g, ""));
+  if (!Number.isFinite(numeric)) return 0;
+  return Math.round(Math.abs(numeric) * 100) / 100;
 }
 
 function seedTasks() {
@@ -496,6 +546,18 @@ function bindEvents() {
   elements.newTaskBtn.addEventListener("click", () => openTaskDialog());
   elements.newWishBtn.addEventListener("click", () => openWishDialog());
   elements.newTripBtn.addEventListener("click", () => openTripDialog());
+  elements.financeUploadBtn.addEventListener("click", () => elements.financeFileInput.click());
+  elements.financeFileInput.addEventListener("change", (event) => processFinanceFiles(event.target.files));
+  elements.financeDropZone.addEventListener("click", () => elements.financeFileInput.click());
+  elements.financeDropZone.addEventListener("dragover", handleFinanceDragOver);
+  elements.financeDropZone.addEventListener("dragleave", handleFinanceDragLeave);
+  elements.financeDropZone.addEventListener("drop", handleFinanceDrop);
+  elements.financePrevMonthBtn.addEventListener("click", () => changeFinanceMonth(-1));
+  elements.financeNextMonthBtn.addEventListener("click", () => changeFinanceMonth(1));
+  elements.financeThisMonthBtn.addEventListener("click", () => {
+    visibleFinanceMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    renderFinance();
+  });
   elements.closeDialogBtn.addEventListener("click", () => closeTaskDialog());
   elements.taskForm.addEventListener("submit", saveTaskFromForm);
   elements.deleteTaskBtn.addEventListener("click", deleteCurrentTask);
@@ -698,6 +760,7 @@ function applyRemoteFamilyData(data = {}) {
     notes: normalizeNotes(data.notes),
     trips: normalizeTrips(data.trips),
     wishes: normalizeWishes(data.wishes),
+    expenses: normalizeExpenses(data.expenses),
     currentMemberId: signedInMemberId || localStorage.getItem(LOCAL_PROFILE_KEY) || state.currentMemberId || "me",
   };
 
@@ -749,6 +812,7 @@ function saveCloudState(force = false) {
     notes: state.notes,
     trips: state.trips,
     wishes: state.wishes,
+    expenses: state.expenses,
     updatedBy: cloudState.user.email || cloudState.user.uid,
     updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
   };
@@ -905,6 +969,7 @@ function render() {
   renderMainTabs();
   renderWishes();
   renderTrips();
+  renderFinance();
   renderStatusTabs();
   populateFormOptions();
   renderTasks();
@@ -966,6 +1031,7 @@ function renderMainTabs() {
           tasks: state.tasks.filter((task) => task.status !== "done").length,
           wishlist: state.wishes.filter((wish) => wish.status !== "done").length,
           vacation: state.trips.length,
+          finance: getExpensesForFinanceMonth().length,
         }[view.id] ?? 0;
       return `
         <button class="main-tab ${activeMainView === view.id ? "active" : ""}" type="button" data-main-view="${view.id}">
@@ -980,6 +1046,7 @@ function renderMainTabs() {
   elements.taskView.hidden = activeMainView !== "tasks";
   elements.wishlistView.hidden = activeMainView !== "wishlist";
   elements.vacationView.hidden = activeMainView !== "vacation";
+  elements.financeView.hidden = activeMainView !== "finance";
 
   elements.mainTabs.querySelectorAll("[data-main-view]").forEach((button) => {
     button.addEventListener("click", () => {
@@ -1441,6 +1508,395 @@ function deleteStopFromDay(dayId, stopId) {
   trip.updatedAt = new Date().toISOString();
   saveState();
   renderTrips();
+}
+
+function renderFinance() {
+  renderFinanceTotal();
+  renderFinanceCalendar();
+  renderFinanceExpenses();
+}
+
+function renderFinanceTotal() {
+  const expenses = getExpensesForFinanceMonth();
+  const total = sumExpenses(expenses);
+  elements.financeMonthlyTotal.textContent = formatMoney(total);
+  elements.financeMonthSummary.textContent = expenses.length
+    ? `${expenses.length} expense${expenses.length === 1 ? "" : "s"} in ${financeMonthName()}.`
+    : `No expenses in ${financeMonthName()}.`;
+}
+
+function renderFinanceCalendar() {
+  elements.financeMonthLabel.textContent = financeMonthName();
+
+  const weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const start = new Date(visibleFinanceMonth);
+  start.setDate(1 - start.getDay());
+
+  const days = [];
+  for (let i = 0; i < 42; i += 1) {
+    const date = new Date(start);
+    date.setDate(start.getDate() + i);
+    days.push(date);
+  }
+
+  elements.financeCalendarGrid.innerHTML = `
+    ${weekdays.map((day) => `<div class="calendar-weekday">${day}</div>`).join("")}
+    ${days
+      .map((date) => {
+        const iso = toISODate(date);
+        const expenses = state.expenses.filter((expense) => expense.date === iso);
+        const outside = date.getMonth() !== visibleFinanceMonth.getMonth();
+        const isToday = iso === isoToday;
+        return `
+          <div class="calendar-day ${outside ? "outside" : ""} ${isToday ? "today" : ""}">
+            <span class="day-number">${date.getDate()}</span>
+            <div class="calendar-items">
+              ${expenses
+                .map(
+                  (expense) => `
+                    <button class="calendar-task finance" type="button" data-finance-expense="${escapeAttribute(expense.id)}" title="${escapeAttribute(`${expense.title} ${formatMoney(expense.amount)}`)}">
+                      ${escapeHTML(`${expense.title} ${formatMoney(expense.amount)}`)}
+                    </button>
+                  `,
+                )
+                .join("")}
+            </div>
+          </div>
+        `;
+      })
+      .join("")}
+  `;
+
+  elements.financeCalendarGrid.querySelectorAll("[data-finance-expense]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const row = elements.financeExpenseList.querySelector(`[data-expense-card="${CSS.escape(button.dataset.financeExpense)}"]`);
+      row?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+  });
+}
+
+function renderFinanceExpenses() {
+  const expenses = getExpensesForFinanceMonth();
+  if (!expenses.length) {
+    elements.financeExpenseList.innerHTML = `<div class="empty-state compact">No finance expenses for this month yet.</div>`;
+    refreshIcons();
+    return;
+  }
+
+  elements.financeExpenseList.innerHTML = expenses
+    .map(
+      (expense) => `
+        <article class="finance-expense-card" data-expense-card="${escapeAttribute(expense.id)}">
+          <div>
+            <strong>${escapeHTML(expense.title)}</strong>
+            <p>${formatLongDate(expense.date)} · ${escapeHTML(expense.category)} · ${escapeHTML(expense.sourceName)}</p>
+            ${expense.textSnippet ? `<p>${escapeHTML(expense.textSnippet)}</p>` : ""}
+          </div>
+          <div class="finance-expense-actions">
+            <span>${formatMoney(expense.amount)}</span>
+            <button class="icon-button danger" type="button" data-delete-expense="${escapeAttribute(expense.id)}" title="Delete expense" aria-label="Delete expense">
+              <i data-lucide="trash-2"></i>
+            </button>
+          </div>
+        </article>
+      `,
+    )
+    .join("");
+
+  elements.financeExpenseList.querySelectorAll("[data-delete-expense]").forEach((button) => {
+    button.addEventListener("click", () => deleteFinanceExpense(button.dataset.deleteExpense));
+  });
+
+  refreshIcons();
+}
+
+function changeFinanceMonth(delta) {
+  visibleFinanceMonth = new Date(visibleFinanceMonth.getFullYear(), visibleFinanceMonth.getMonth() + delta, 1);
+  renderFinance();
+  renderMainTabs();
+}
+
+function deleteFinanceExpense(expenseId) {
+  const expense = state.expenses.find((item) => item.id === expenseId);
+  if (!expense) return;
+  const confirmed = window.confirm(`Delete "${expense.title}" for ${formatMoney(expense.amount)}?`);
+  if (!confirmed) return;
+  state.expenses = state.expenses.filter((item) => item.id !== expenseId);
+  saveState();
+  renderFinance();
+  renderMainTabs();
+}
+
+function handleFinanceDragOver(event) {
+  event.preventDefault();
+  elements.financeDropZone.classList.add("dragging");
+}
+
+function handleFinanceDragLeave() {
+  elements.financeDropZone.classList.remove("dragging");
+}
+
+function handleFinanceDrop(event) {
+  event.preventDefault();
+  elements.financeDropZone.classList.remove("dragging");
+  processFinanceFiles(event.dataTransfer.files);
+}
+
+async function processFinanceFiles(fileList) {
+  const files = [...(fileList || [])];
+  if (!files.length) return;
+
+  elements.financeProcessStatus.textContent = `Processing ${files.length} file${files.length === 1 ? "" : "s"}...`;
+  elements.financeUploadBtn.disabled = true;
+
+  const now = new Date().toISOString();
+  const extractedExpenses = [];
+  const failures = [];
+
+  for (const file of files) {
+    try {
+      elements.financeProcessStatus.textContent = `Reading ${file.name}...`;
+      const text = await extractFinanceText(file);
+      const expenses = extractExpensesFromBillText(text, file, now);
+      if (expenses.length) {
+        extractedExpenses.push(...expenses);
+      } else {
+        failures.push(file.name);
+      }
+    } catch (error) {
+      console.error(error);
+      failures.push(file.name);
+    }
+  }
+
+  if (extractedExpenses.length) {
+    state.expenses.unshift(...extractedExpenses);
+    state.expenses = normalizeExpenses(state.expenses);
+    visibleFinanceMonth = parseLocalDate(extractedExpenses[0].date);
+    visibleFinanceMonth = new Date(visibleFinanceMonth.getFullYear(), visibleFinanceMonth.getMonth(), 1);
+    saveState();
+  }
+
+  elements.financeFileInput.value = "";
+  elements.financeUploadBtn.disabled = false;
+  elements.financeProcessStatus.textContent = [
+    extractedExpenses.length
+      ? `Added ${extractedExpenses.length} expense${extractedExpenses.length === 1 ? "" : "s"}.`
+      : "No expenses were found.",
+    failures.length ? `Could not read: ${failures.join(", ")}.` : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+  renderFinance();
+  renderMainTabs();
+}
+
+async function extractFinanceText(file) {
+  if (file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")) {
+    return extractPdfText(file);
+  }
+
+  if (file.type.startsWith("image/")) {
+    return extractImageText(file);
+  }
+
+  return file.text();
+}
+
+async function extractPdfText(file) {
+  if (!window.pdfjsLib) {
+    throw new Error("PDF reader did not load.");
+  }
+
+  window.pdfjsLib.GlobalWorkerOptions.workerSrc =
+    window.pdfjsLib.GlobalWorkerOptions.workerSrc || "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+
+  const bytes = await file.arrayBuffer();
+  const pdf = await window.pdfjsLib.getDocument({ data: bytes }).promise;
+  const pages = [];
+  for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
+    const page = await pdf.getPage(pageNumber);
+    const content = await page.getTextContent();
+    const rows = new Map();
+    content.items.forEach((item) => {
+      const y = Math.round(item.transform?.[5] || 0);
+      const x = item.transform?.[4] || 0;
+      const row = rows.get(y) || [];
+      row.push({ x, text: item.str });
+      rows.set(y, row);
+    });
+    pages.push(
+      [...rows.entries()]
+        .sort((a, b) => b[0] - a[0])
+        .map(([, row]) =>
+          row
+            .sort((a, b) => a.x - b.x)
+            .map((item) => item.text)
+            .join(" "),
+        )
+        .join("\n"),
+    );
+  }
+  return pages.join("\n");
+}
+
+async function extractImageText(file) {
+  if (!window.Tesseract) {
+    throw new Error("Image OCR did not load.");
+  }
+
+  const result = await window.Tesseract.recognize(file, "eng");
+  return result?.data?.text || "";
+}
+
+function extractExpensesFromBillText(text, file, now) {
+  const cleanedText = String(text || "").replace(/\u00a0/g, " ");
+  const lines = cleanedText
+    .split(/\r?\n/)
+    .map((line) => line.replace(/\s{2,}/g, " ").trim())
+    .filter(Boolean);
+
+  const sourceName = file.name;
+  const sourceType = file.type || "upload";
+  const transactionRows = lines
+    .map((line) => parseFinanceExpenseLine(line, sourceName, sourceType, now))
+    .filter(Boolean);
+
+  if (transactionRows.length >= 3) return transactionRows.slice(0, 80);
+
+  const date = findFinanceDate(cleanedText) || transactionRows[0]?.date || isoToday;
+  const amount = findFinanceTotalAmount(lines) || transactionRows[0]?.amount || findLargestFinanceAmount(cleanedText);
+  if (!amount) return [];
+
+  const merchant = deriveFinanceMerchant(lines, sourceName);
+  return [
+    {
+      id: crypto.randomUUID(),
+      title: merchant,
+      merchant,
+      date,
+      amount,
+      category: inferFinanceCategory(`${sourceName} ${cleanedText}`),
+      sourceName,
+      sourceType,
+      textSnippet: lines.slice(0, 4).join(" · ").slice(0, 260),
+      addedBy: state.currentMemberId,
+      createdAt: now,
+      updatedAt: now,
+    },
+  ];
+}
+
+function parseFinanceExpenseLine(line, sourceName, sourceType, now) {
+  if (isNonExpenseFinanceLine(line)) return null;
+  const date = findFinanceDate(line);
+  if (!date) return null;
+  const amounts = findFinanceAmounts(line).filter((amount) => amount > 0 && amount < 50000);
+  if (!amounts.length) return null;
+
+  const amount = amounts.at(-1);
+  const merchant = cleanFinanceTitle(line) || deriveFinanceMerchant([line], sourceName);
+  return {
+    id: crypto.randomUUID(),
+    title: merchant,
+    merchant,
+    date,
+    amount,
+    category: inferFinanceCategory(`${sourceName} ${line}`),
+    sourceName,
+    sourceType,
+    textSnippet: line.slice(0, 260),
+    addedBy: state.currentMemberId,
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
+function isNonExpenseFinanceLine(line) {
+  return /\b(payment|refund|credit|cashback|available credit|credit limit|previous balance|autopay|thank you)\b/i.test(line);
+}
+
+function findFinanceDate(text) {
+  const value = String(text || "");
+  const iso = value.match(/\b(\d{4})-(\d{1,2})-(\d{1,2})\b/);
+  if (iso) return financeDatePartsToISO(Number(iso[1]), Number(iso[2]), Number(iso[3]));
+
+  const numeric = value.match(/\b(\d{1,2})[\/.-](\d{1,2})(?:[\/.-](\d{2,4}))?\b/);
+  if (numeric) {
+    const year = numeric[3] ? normalizeYear(Number(numeric[3])) : today.getFullYear();
+    return financeDatePartsToISO(year, Number(numeric[1]), Number(numeric[2]));
+  }
+
+  const monthFirst = value.match(
+    /\b(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\.?\s+(\d{1,2})(?:,?\s+(\d{2,4}))?\b/i,
+  );
+  if (monthFirst) {
+    const year = monthFirst[3] ? normalizeYear(Number(monthFirst[3])) : today.getFullYear();
+    return financeDatePartsToISO(year, monthNameToNumber(monthFirst[1]), Number(monthFirst[2]));
+  }
+
+  const dayFirst = value.match(
+    /\b(\d{1,2})\s+(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)(?:\.|,)?(?:\s+(\d{2,4}))?\b/i,
+  );
+  if (dayFirst) {
+    const year = dayFirst[3] ? normalizeYear(Number(dayFirst[3])) : today.getFullYear();
+    return financeDatePartsToISO(year, monthNameToNumber(dayFirst[2]), Number(dayFirst[1]));
+  }
+
+  return "";
+}
+
+function financeDatePartsToISO(year, month, day) {
+  if (!month || !day || month < 1 || month > 12 || day < 1 || day > 31) return "";
+  const candidate = new Date(year, month - 1, day);
+  if (candidate.getFullYear() !== year || candidate.getMonth() !== month - 1 || candidate.getDate() !== day) return "";
+  return toISODate(candidate);
+}
+
+function findFinanceAmounts(text) {
+  return [...String(text || "").matchAll(/(?:[$]\s*)?(-?\d{1,3}(?:,\d{3})*|\d+)\.(\d{2})\b/g)]
+    .map((match) => normalizeExpenseAmount(`${match[1]}.${match[2]}`))
+    .filter(Boolean);
+}
+
+function findFinanceTotalAmount(lines) {
+  const totalLines = lines.filter((line) =>
+    /\b(grand total|amount due|total due|new charges|new balance|statement balance|total)\b/i.test(line) &&
+    !/\b(subtotal|savings|change|tax total|total items)\b/i.test(line),
+  );
+  const candidates = totalLines.flatMap((line) => findFinanceAmounts(line)).filter((amount) => amount > 0 && amount < 50000);
+  return candidates.at(-1) || 0;
+}
+
+function findLargestFinanceAmount(text) {
+  const amounts = findFinanceAmounts(text).filter((amount) => amount > 0 && amount < 50000);
+  return amounts.length ? Math.max(...amounts) : 0;
+}
+
+function deriveFinanceMerchant(lines, sourceName) {
+  const firstMeaningfulLine = lines.find((line) => !findFinanceAmounts(line).length && !findFinanceDate(line) && line.length > 2);
+  return cleanFinanceTitle(firstMeaningfulLine || sourceName.replace(/\.[^.]+$/, "")) || "Uploaded bill";
+}
+
+function cleanFinanceTitle(text) {
+  return String(text || "")
+    .replace(/\b\d{1,2}[\/.-]\d{1,2}(?:[\/.-]\d{2,4})?\b/g, " ")
+    .replace(/\b\d{4}-\d{1,2}-\d{1,2}\b/g, " ")
+    .replace(/[$]?\s*-?\d{1,3}(?:,\d{3})*(?:\.\d{2})\b/g, " ")
+    .replace(/\b(purchase|debit|visa|mastercard|amex|card|transaction)\b/gi, " ")
+    .replace(/\s{2,}/g, " ")
+    .trim()
+    .slice(0, 80);
+}
+
+function inferFinanceCategory(text) {
+  const value = String(text || "").toLowerCase();
+  if (/\b(phone|wireless|verizon|at&t|tmobile|t-mobile|mobile)\b/.test(value)) return "Phone";
+  if (/\b(restaurant|cafe|coffee|pizza|doordash|uber eats|food|grocery|market)\b/.test(value)) return "Food";
+  if (/\b(gas|fuel|chevron|shell|exxon|parking|toll)\b/.test(value)) return "Travel";
+  if (/\b(electric|water|utility|internet|cable|pg&e|pge)\b/.test(value)) return "Utilities";
+  if (/\b(credit card|statement|visa|mastercard|amex)\b/.test(value)) return "Credit card";
+  return "Bills";
 }
 
 function openLoginDialog(memberId = state.currentMemberId) {
@@ -3208,6 +3664,7 @@ function importState(event) {
         notes: normalizeNotes(imported.notes),
         trips: normalizeTrips(imported.trips),
         wishes: normalizeWishes(imported.wishes),
+        expenses: normalizeExpenses(imported.expenses),
         currentMemberId: imported.currentMemberId || "me",
       };
       selectedTaskId = state.tasks[0]?.id ?? null;
@@ -3300,6 +3757,25 @@ function getSortedWishes() {
     if (!a.targetDate && b.targetDate) return 1;
     return b.updatedAt.localeCompare(a.updatedAt);
   });
+}
+
+function getExpensesForFinanceMonth() {
+  const month = visibleFinanceMonth.getMonth();
+  const year = visibleFinanceMonth.getFullYear();
+  return [...state.expenses]
+    .filter((expense) => {
+      const date = parseLocalDate(expense.date);
+      return date.getMonth() === month && date.getFullYear() === year;
+    })
+    .sort((a, b) => {
+      const dateDiff = a.date.localeCompare(b.date);
+      if (dateDiff !== 0) return dateDiff;
+      return a.title.localeCompare(b.title);
+    });
+}
+
+function sumExpenses(expenses) {
+  return expenses.reduce((total, expense) => total + expense.amount, 0);
 }
 
 function getDueState(task) {
@@ -3396,6 +3872,14 @@ function formatLongDate(dateString) {
     day: "numeric",
     year: "numeric",
   });
+}
+
+function financeMonthName() {
+  return visibleFinanceMonth.toLocaleDateString(undefined, { month: "long", year: "numeric" });
+}
+
+function formatMoney(amount) {
+  return new Intl.NumberFormat(undefined, { style: "currency", currency: "USD" }).format(amount || 0);
 }
 
 function formatDateTime(value) {
