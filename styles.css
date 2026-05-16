@@ -348,6 +348,7 @@ label.import-button {
 }
 
 .task-panel,
+.travel-panel,
 .detail-panel,
 .calendar-panel,
 .reminder-panel,
@@ -361,6 +362,7 @@ label.import-button {
 }
 
 .task-panel,
+.travel-panel,
 .detail-panel,
 .reminder-panel,
 .notebook-panel,
@@ -370,6 +372,155 @@ label.import-button {
 
 .calendar-panel {
   padding: 18px 18px 14px;
+}
+
+.travel-grid {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.34fr) minmax(0, 1fr);
+  gap: 14px;
+}
+
+.trip-list,
+.trip-detail-stack,
+.hotel-list,
+.trip-day-list,
+.stop-list {
+  display: grid;
+  gap: 10px;
+}
+
+.trip-row {
+  display: grid;
+  gap: 5px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  background: var(--surface);
+  text-align: left;
+}
+
+.trip-row.selected {
+  border-color: var(--teal);
+  background: var(--surface-soft);
+}
+
+.trip-row span,
+.trip-hero p,
+.trip-day-heading p,
+.hotel-card p,
+.stop-card p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.trip-hero,
+.hotel-card,
+.trip-day-card,
+.stop-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.trip-hero {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px;
+  background: #f8fafc;
+}
+
+.trip-hero h3,
+.trip-section h3,
+.trip-day-heading h3 {
+  margin: 0;
+}
+
+.trip-hero h3 {
+  font-size: 1.45rem;
+}
+
+.trip-section {
+  display: grid;
+  gap: 10px;
+}
+
+.section-heading-inline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.hotel-card,
+.stop-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  padding: 12px;
+}
+
+.hotel-card strong,
+.stop-card strong {
+  display: block;
+  margin: 5px 0;
+  overflow-wrap: anywhere;
+}
+
+.trip-day-card {
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+}
+
+.trip-day-heading {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.travel-form {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  padding: 10px;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.travel-form input,
+.travel-form select {
+  min-width: 0;
+  min-height: 40px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: white;
+}
+
+.travel-form button {
+  justify-self: start;
+}
+
+.stop-card.food {
+  border-left: 5px solid var(--coral);
+}
+
+.stop-card.sightseeing {
+  border-left: 5px solid var(--teal);
+}
+
+.stop-card.drive {
+  border-left: 5px solid var(--indigo);
+}
+
+.stop-card.hotel {
+  border-left: 5px solid var(--amber);
 }
 
 .panel-heading,
@@ -867,6 +1018,11 @@ label.import-button {
   background: #ffe4dc;
 }
 
+.calendar-task.trip {
+  color: #135e46;
+  background: #dff4ea;
+}
+
 .calendar-task.done {
   text-decoration: line-through;
   opacity: 0.68;
@@ -1069,14 +1225,16 @@ label.import-button {
   gap: 12px;
 }
 
-#deleteTaskBtn {
+#deleteTaskBtn,
+#deleteTripBtn {
   margin-right: auto;
   color: var(--red);
 }
 
 @media (max-width: 1080px) {
   .dashboard-grid,
-  .lower-grid {
+  .lower-grid,
+  .travel-grid {
     grid-template-columns: 1fr;
   }
 
@@ -1109,6 +1267,7 @@ label.import-button {
 
   .detail-facts,
   .form-grid,
+  .travel-form,
   .admin-pin-grid,
   .assistant-form,
   .login-grid,
@@ -1118,6 +1277,14 @@ label.import-button {
 
   .comment-form button {
     width: 100%;
+  }
+
+  .trip-hero,
+  .trip-day-heading,
+  .hotel-card,
+  .stop-card {
+    grid-template-columns: 1fr;
+    flex-direction: column;
   }
 
   .calendar {

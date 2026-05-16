@@ -67,6 +67,23 @@
     <main class="app-shell">
       <section class="member-strip" id="memberStrip" aria-label="Family members"></section>
 
+      <section class="travel-panel" aria-label="Family vacation plans">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">Vacation plans</p>
+            <h2>Family travel</h2>
+          </div>
+          <button class="primary-button" id="newTripBtn" type="button">
+            <i data-lucide="map-plus"></i>
+            New trip
+          </button>
+        </div>
+        <div class="travel-grid">
+          <div class="trip-list" id="tripList"></div>
+          <div class="trip-detail" id="tripDetail"></div>
+        </div>
+      </section>
+
       <section class="dashboard-grid">
         <section class="task-panel" aria-label="Task lists">
           <div class="panel-heading">
@@ -240,6 +257,60 @@
           <button class="primary-button" type="submit">
             <i data-lucide="save"></i>
             Save
+          </button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="tripDialog" class="task-dialog">
+      <form id="tripForm" method="dialog">
+        <div class="dialog-heading">
+          <div>
+            <p class="eyebrow">Vacation plan</p>
+            <h2 id="tripDialogTitle">New trip</h2>
+          </div>
+          <button class="icon-button" id="closeTripDialogBtn" value="cancel" type="button" title="Close" aria-label="Close">
+            <i data-lucide="x">×</i>
+          </button>
+        </div>
+
+        <input id="tripId" type="hidden" />
+
+        <label>
+          Trip name
+          <input id="tripTitle" required maxlength="80" placeholder="Summer road trip" />
+        </label>
+
+        <label>
+          Destination
+          <input id="tripDestination" required maxlength="120" placeholder="San Diego, CA" />
+        </label>
+
+        <div class="form-grid">
+          <label>
+            Start date
+            <input id="tripStartDate" type="date" required />
+          </label>
+
+          <label>
+            End date
+            <input id="tripEndDate" type="date" required />
+          </label>
+        </div>
+
+        <label>
+          Notes
+          <textarea id="tripNotes" rows="4" placeholder="Flights, budget, packing reminders, confirmation numbers"></textarea>
+        </label>
+
+        <div class="dialog-actions">
+          <button class="secondary-button" id="deleteTripBtn" type="button">
+            <i data-lucide="trash-2"></i>
+            Delete
+          </button>
+          <button class="primary-button" type="submit">
+            <i data-lucide="save"></i>
+            Save trip
           </button>
         </div>
       </form>

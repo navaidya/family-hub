@@ -63,6 +63,7 @@ const isoToday = toISODate(today);
 let state = loadState();
 let activeStatus = "all";
 let selectedTaskId = state.tasks[0]?.id ?? null;
+let selectedTripId = state.trips?.[0]?.id ?? null;
 let visibleMonth = new Date(today.getFullYear(), today.getMonth(), 1);
 let pendingLoginMemberId = state.currentMemberId;
 let cloudState = createCloudState();
@@ -75,6 +76,9 @@ const elements = {
   currentProfileBtn: document.querySelector("#currentProfileBtn"),
   loginBtn: document.querySelector("#loginBtn"),
   memberStrip: document.querySelector("#memberStrip"),
+  newTripBtn: document.querySelector("#newTripBtn"),
+  tripList: document.querySelector("#tripList"),
+  tripDetail: document.querySelector("#tripDetail"),
   statusTabs: document.querySelector("#statusTabs"),
   taskList: document.querySelector("#taskList"),
   taskDetail: document.querySelector("#taskDetail"),
@@ -88,6 +92,11 @@ const elements = {
   closeDialogBtn: document.querySelector("#closeDialogBtn"),
   deleteTaskBtn: document.querySelector("#deleteTaskBtn"),
   dialogTitle: document.querySelector("#dialogTitle"),
+  tripDialog: document.querySelector("#tripDialog"),
+  tripForm: document.querySelector("#tripForm"),
+  tripDialogTitle: document.querySelector("#tripDialogTitle"),
+  closeTripDialogBtn: document.querySelector("#closeTripDialogBtn"),
+  deleteTripBtn: document.querySelector("#deleteTripBtn"),
   exportBtn: document.querySelector("#exportBtn"),
   importInput: document.querySelector("#importInput"),
   emailDigestBtn: document.querySelector("#emailDigestBtn"),
@@ -146,6 +155,15 @@ const form = {
   description: document.querySelector("#taskDescription"),
 };
 
+const tripForm = {
+  id: document.querySelector("#tripId"),
+  title: document.querySelector("#tripTitle"),
+  destination: document.querySelector("#tripDestination"),
+  startDate: document.querySelector("#tripStartDate"),
+  endDate: document.querySelector("#tripEndDate"),
+  notes: document.querySelector("#tripNotes"),
+};
+
 render();
 bindEvents();
 registerServiceWorker();
@@ -161,6 +179,7 @@ function loadState() {
         members: normalizeMembers(parsed.members),
         tasks: normalizeTasks(parsed.tasks?.length ? parsed.tasks : seedTasks()),
         notes: normalizeNotes(parsed.notes),
+        trips: normalizeTrips(parsed.trips),
         currentMemberId: localStorage.getItem(LOCAL_PROFILE_KEY) || parsed.currentMemberId || "me",
       };
     } catch (error) {
@@ -172,6 +191,7 @@ function loadState() {
     members: normalizeMembers(),
     tasks: normalizeTasks(seedTasks()),
     notes: normalizeNotes(),
+    trips: normalizeTrips(),
     currentMemberId: localStorage.getItem(LOCAL_PROFILE_KEY) || "me",
   };
 }
@@ -221,6 +241,65 @@ function normalizeNotes(notes = {}) {
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
     return notebooks;
   }, {});
+}
+
+function normalizeTrips(trips = []) {
+  if (!Array.isArray(trips)) return [];
+
+  return trips
+    .filter((trip) => trip && typeof trip === "object")
+    .map((trip) => ({
+      id: trip.id || crypto.randomUUID(),
+      title: String(trip.title || "Family trip").trim(),
+      destination: String(trip.destination || "").trim(),
+      startDate: trip.startDate || isoToday,
+      endDate: trip.endDate || trip.startDate || isoToday,
+      notes: String(trip.notes || "").trim(),
+      hotels: normalizeHotels(trip.hotels),
+      days: normalizeTripDays(trip.days),
+      createdAt: trip.createdAt || new Date().toISOString(),
+      updatedAt: trip.updatedAt || trip.createdAt || new Date().toISOString(),
+    }))
+    .sort((a, b) => a.startDate.localeCompare(b.startDate));
+}
+
+function normalizeHotels(hotels = []) {
+  if (!Array.isArray(hotels)) return [];
+  return hotels.map((hotel) => ({
+    id: hotel.id || crypto.randomUUID(),
+    name: String(hotel.name || "").trim(),
+    address: String(hotel.address || "").trim(),
+    checkIn: hotel.checkIn || "",
+    checkOut: hotel.checkOut || "",
+    bookingUrl: String(hotel.bookingUrl || "").trim(),
+    notes: String(hotel.notes || "").trim(),
+  }));
+}
+
+function normalizeTripDays(days = []) {
+  if (!Array.isArray(days)) return [];
+  return days
+    .map((day) => ({
+      id: day.id || crypto.randomUUID(),
+      date: day.date || isoToday,
+      title: String(day.title || "").trim(),
+      notes: String(day.notes || "").trim(),
+      stops: normalizeTripStops(day.stops),
+    }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+}
+
+function normalizeTripStops(stops = []) {
+  if (!Array.isArray(stops)) return [];
+  return stops.map((stop) => ({
+    id: stop.id || crypto.randomUUID(),
+    type: stop.type || "sightseeing",
+    name: String(stop.name || "").trim(),
+    address: String(stop.address || "").trim(),
+    time: String(stop.time || "").trim(),
+    url: String(stop.url || "").trim(),
+    notes: String(stop.notes || "").trim(),
+  }));
 }
 
 function normalizePin(pin) {
@@ -292,9 +371,13 @@ function bindEvents() {
   elements.currentProfileBtn.addEventListener("click", openProfileDialog);
   elements.loginBtn.addEventListener("click", () => openLoginDialog());
   elements.newTaskBtn.addEventListener("click", () => openTaskDialog());
+  elements.newTripBtn.addEventListener("click", () => openTripDialog());
   elements.closeDialogBtn.addEventListener("click", () => closeTaskDialog());
   elements.taskForm.addEventListener("submit", saveTaskFromForm);
   elements.deleteTaskBtn.addEventListener("click", deleteCurrentTask);
+  elements.closeTripDialogBtn.addEventListener("click", closeTripDialog);
+  elements.tripForm.addEventListener("submit", saveTripFromForm);
+  elements.deleteTripBtn.addEventListener("click", deleteCurrentTrip);
   elements.searchInput.addEventListener("input", renderTasks);
   elements.exportBtn.addEventListener("click", exportState);
   elements.importInput.addEventListener("change", importState);
@@ -309,6 +392,10 @@ function bindEvents() {
 
   elements.taskDialog.addEventListener("click", (event) => {
     if (event.target === elements.taskDialog) closeTaskDialog();
+  });
+
+  elements.tripDialog.addEventListener("click", (event) => {
+    if (event.target === elements.tripDialog) closeTripDialog();
   });
 
   elements.loginForm.addEventListener("submit", loginAsSelectedMember);
@@ -460,6 +547,7 @@ function applyRemoteFamilyData(data = {}) {
     members: normalizeMembers(data.members),
     tasks: normalizeTasks(data.tasks?.length ? data.tasks : []),
     notes: normalizeNotes(data.notes),
+    trips: normalizeTrips(data.trips),
     currentMemberId: localStorage.getItem(LOCAL_PROFILE_KEY) || state.currentMemberId || "me",
   };
 
@@ -469,6 +557,10 @@ function applyRemoteFamilyData(data = {}) {
 
   if (!state.tasks.some((task) => task.id === selectedTaskId)) {
     selectedTaskId = state.tasks[0]?.id ?? null;
+  }
+
+  if (!state.trips.some((trip) => trip.id === selectedTripId)) {
+    selectedTripId = state.trips[0]?.id ?? null;
   }
 
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
@@ -491,6 +583,7 @@ function saveCloudState(force = false) {
     members: state.members,
     tasks: state.tasks,
     notes: state.notes,
+    trips: state.trips,
     updatedBy: cloudState.user.email || cloudState.user.uid,
     updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
   };
@@ -632,6 +725,7 @@ function render() {
   renderCloudStatus();
   renderCurrentProfile();
   renderMemberStrip();
+  renderTrips();
   renderStatusTabs();
   populateFormOptions();
   renderTasks();
@@ -681,6 +775,314 @@ function renderMemberStrip() {
   elements.memberStrip.querySelectorAll("[data-login-member]").forEach((button) => {
     button.addEventListener("click", () => openLoginDialog(button.dataset.loginMember));
   });
+}
+
+function renderTrips() {
+  if (!state.trips.length) {
+    elements.tripList.innerHTML = `<div class="empty-state compact">No trips yet.</div>`;
+    elements.tripDetail.innerHTML = `
+      <div class="empty-detail compact-detail">
+        <i data-lucide="map"></i>
+        <h2>Plan a family vacation</h2>
+        <p>Add a trip, then build hotels, food stops, sightseeing, and day-by-day maps.</p>
+      </div>
+    `;
+    refreshIcons();
+    return;
+  }
+
+  if (!getSelectedTrip()) {
+    selectedTripId = state.trips[0].id;
+  }
+
+  elements.tripList.innerHTML = state.trips
+    .map(
+      (trip) => `
+        <button class="trip-row ${trip.id === selectedTripId ? "selected" : ""}" type="button" data-trip-id="${escapeAttribute(trip.id)}">
+          <strong>${escapeHTML(trip.title)}</strong>
+          <span>${escapeHTML(trip.destination)} · ${formatTripRange(trip)}</span>
+          <span>${trip.days.length} day${trip.days.length === 1 ? "" : "s"} · ${trip.hotels.length} hotel${trip.hotels.length === 1 ? "" : "s"}</span>
+        </button>
+      `,
+    )
+    .join("");
+
+  elements.tripList.querySelectorAll("[data-trip-id]").forEach((button) => {
+    button.addEventListener("click", () => {
+      selectedTripId = button.dataset.tripId;
+      renderTrips();
+    });
+  });
+
+  renderTripDetail();
+}
+
+function renderTripDetail() {
+  const trip = getSelectedTrip();
+  if (!trip) return;
+
+  const destinationLinks = renderMapLinks(`${trip.destination}`, "Destination map");
+  const hotelCards = trip.hotels.length
+    ? trip.hotels.map((hotel) => renderHotelCard(hotel)).join("")
+    : `<div class="empty-state compact">No hotel stays added.</div>`;
+  const dayCards = trip.days.length
+    ? trip.days.map((day) => renderTripDayCard(trip, day)).join("")
+    : `<div class="empty-state compact">No daily plans yet.</div>`;
+
+  elements.tripDetail.innerHTML = `
+    <div class="trip-detail-stack">
+      <div class="trip-hero">
+        <div>
+          <p class="eyebrow">${escapeHTML(trip.destination || "Trip")}</p>
+          <h3>${escapeHTML(trip.title)}</h3>
+          <p>${formatTripRange(trip)}</p>
+        </div>
+        <div class="detail-actions">
+          ${destinationLinks}
+          <button class="secondary-button" type="button" data-trip-edit="${escapeAttribute(trip.id)}"><i data-lucide="pencil"></i>Edit</button>
+        </div>
+      </div>
+
+      <section class="trip-section">
+        <h3>Trip notes</h3>
+        <p class="task-description">${escapeHTML(trip.notes || "No trip notes yet.")}</p>
+      </section>
+
+      <section class="trip-section">
+        <div class="section-heading-inline">
+          <h3>Hotel stays</h3>
+        </div>
+        <div class="hotel-list">${hotelCards}</div>
+        ${renderHotelForm(trip)}
+      </section>
+
+      <section class="trip-section">
+        <div class="section-heading-inline">
+          <h3>Daily plans</h3>
+        </div>
+        ${renderTripDayForm(trip)}
+        <div class="trip-day-list">${dayCards}</div>
+      </section>
+    </div>
+  `;
+
+  elements.tripDetail.querySelector("[data-trip-edit]").addEventListener("click", () => openTripDialog(trip));
+  elements.tripDetail.querySelector("[data-hotel-form]").addEventListener("submit", addHotelToTrip);
+  elements.tripDetail.querySelector("[data-day-form]").addEventListener("submit", addDayToTrip);
+  elements.tripDetail.querySelectorAll("[data-hotel-delete]").forEach((button) => {
+    button.addEventListener("click", () => deleteHotelFromTrip(button.dataset.hotelDelete));
+  });
+  elements.tripDetail.querySelectorAll("[data-day-delete]").forEach((button) => {
+    button.addEventListener("click", () => deleteDayFromTrip(button.dataset.dayDelete));
+  });
+  elements.tripDetail.querySelectorAll("[data-stop-delete]").forEach((button) => {
+    button.addEventListener("click", () => deleteStopFromDay(button.dataset.dayId, button.dataset.stopDelete));
+  });
+  elements.tripDetail.querySelectorAll("[data-stop-form]").forEach((formElement) => {
+    formElement.addEventListener("submit", addStopToDay);
+  });
+  refreshIcons();
+}
+
+function renderHotelCard(hotel) {
+  const address = hotel.address || hotel.name;
+  return `
+    <article class="hotel-card">
+      <div>
+        <strong>${escapeHTML(hotel.name || "Hotel stay")}</strong>
+        <p>${escapeHTML(hotel.address || "No address added.")}</p>
+        <p>${escapeHTML(formatStayRange(hotel))}</p>
+        ${hotel.notes ? `<p>${escapeHTML(hotel.notes)}</p>` : ""}
+      </div>
+      <div class="detail-actions">
+        ${renderMapLinks(address, "Hotel map")}
+        ${hotel.bookingUrl ? `<a class="secondary-button" href="${escapeAttribute(hotel.bookingUrl)}" target="_blank" rel="noreferrer"><i data-lucide="external-link"></i>Booking</a>` : ""}
+        <button class="icon-button danger" type="button" data-hotel-delete="${escapeAttribute(hotel.id)}" title="Delete hotel" aria-label="Delete hotel">
+          <i data-lucide="trash-2"></i>
+        </button>
+      </div>
+    </article>
+  `;
+}
+
+function renderHotelForm(trip) {
+  return `
+    <form class="travel-form" data-hotel-form data-trip-id="${escapeAttribute(trip.id)}">
+      <input name="name" required maxlength="90" placeholder="Hotel name" />
+      <input name="address" maxlength="160" placeholder="Hotel address" />
+      <input name="checkIn" type="date" value="${escapeAttribute(trip.startDate)}" />
+      <input name="checkOut" type="date" value="${escapeAttribute(trip.endDate)}" />
+      <input name="bookingUrl" type="url" placeholder="Booking link" />
+      <input name="notes" maxlength="180" placeholder="Confirmation, parking, breakfast" />
+      <button class="secondary-button" type="submit"><i data-lucide="bed"></i>Add hotel</button>
+    </form>
+  `;
+}
+
+function renderTripDayForm(trip) {
+  return `
+    <form class="travel-form day-form" data-day-form data-trip-id="${escapeAttribute(trip.id)}">
+      <input name="date" type="date" required value="${escapeAttribute(nextTripDayDate(trip))}" />
+      <input name="title" maxlength="80" placeholder="Day title, e.g. Beach and Old Town" />
+      <input name="notes" maxlength="180" placeholder="Per-day plan notes" />
+      <button class="secondary-button" type="submit"><i data-lucide="calendar-plus"></i>Add day</button>
+    </form>
+  `;
+}
+
+function renderTripDayCard(trip, day) {
+  const stops = day.stops.length
+    ? day.stops.map((stop) => renderTripStop(day, stop)).join("")
+    : `<div class="empty-state compact">No stops yet.</div>`;
+  return `
+    <article class="trip-day-card">
+      <div class="trip-day-heading">
+        <div>
+          <p class="eyebrow">${formatLongDate(day.date)}</p>
+          <h3>${escapeHTML(day.title || `Day ${trip.days.indexOf(day) + 1}`)}</h3>
+          ${day.notes ? `<p>${escapeHTML(day.notes)}</p>` : ""}
+        </div>
+        <div class="detail-actions">
+          ${renderDayMapLinks(day)}
+          <button class="icon-button danger" type="button" data-day-delete="${escapeAttribute(day.id)}" title="Delete day" aria-label="Delete day">
+            <i data-lucide="trash-2"></i>
+          </button>
+        </div>
+      </div>
+      <div class="stop-list">${stops}</div>
+      ${renderStopForm(day)}
+    </article>
+  `;
+}
+
+function renderTripStop(day, stop) {
+  const place = stop.address || stop.name;
+  return `
+    <article class="stop-card ${escapeAttribute(stop.type)}">
+      <div>
+        <span class="badge">${tripStopTypeLabel(stop.type)}</span>
+        <strong>${escapeHTML(stop.time ? `${stop.time} · ${stop.name}` : stop.name)}</strong>
+        <p>${escapeHTML(stop.address || "No address added.")}</p>
+        ${stop.notes ? `<p>${escapeHTML(stop.notes)}</p>` : ""}
+      </div>
+      <div class="detail-actions">
+        ${renderMapLinks(place, "Stop map")}
+        ${stop.url ? `<a class="secondary-button" href="${escapeAttribute(stop.url)}" target="_blank" rel="noreferrer"><i data-lucide="external-link"></i>Link</a>` : ""}
+        <button class="icon-button danger" type="button" data-day-id="${escapeAttribute(day.id)}" data-stop-delete="${escapeAttribute(stop.id)}" title="Delete stop" aria-label="Delete stop">
+          <i data-lucide="trash-2"></i>
+        </button>
+      </div>
+    </article>
+  `;
+}
+
+function renderStopForm(day) {
+  return `
+    <form class="travel-form stop-form" data-stop-form data-day-id="${escapeAttribute(day.id)}">
+      <select name="type">
+        <option value="sightseeing">Sightseeing</option>
+        <option value="food">Food stop</option>
+        <option value="hotel">Hotel</option>
+        <option value="drive">Drive</option>
+        <option value="other">Other</option>
+      </select>
+      <input name="time" placeholder="Time" maxlength="20" />
+      <input name="name" required maxlength="90" placeholder="Place or activity" />
+      <input name="address" maxlength="160" placeholder="Address or map search text" />
+      <input name="url" type="url" placeholder="Website/menu link" />
+      <input name="notes" maxlength="180" placeholder="Notes, tickets, must order" />
+      <button class="secondary-button" type="submit"><i data-lucide="map-pin-plus"></i>Add stop</button>
+    </form>
+  `;
+}
+
+function addHotelToTrip(event) {
+  event.preventDefault();
+  const trip = getSelectedTrip();
+  if (!trip) return;
+  const data = new FormData(event.currentTarget);
+  trip.hotels.push({
+    id: crypto.randomUUID(),
+    name: String(data.get("name") || "").trim(),
+    address: String(data.get("address") || "").trim(),
+    checkIn: String(data.get("checkIn") || ""),
+    checkOut: String(data.get("checkOut") || ""),
+    bookingUrl: String(data.get("bookingUrl") || "").trim(),
+    notes: String(data.get("notes") || "").trim(),
+  });
+  trip.updatedAt = new Date().toISOString();
+  saveState();
+  renderTrips();
+}
+
+function addDayToTrip(event) {
+  event.preventDefault();
+  const trip = getSelectedTrip();
+  if (!trip) return;
+  const data = new FormData(event.currentTarget);
+  trip.days.push({
+    id: crypto.randomUUID(),
+    date: String(data.get("date") || trip.startDate),
+    title: String(data.get("title") || "").trim(),
+    notes: String(data.get("notes") || "").trim(),
+    stops: [],
+  });
+  trip.days.sort((a, b) => a.date.localeCompare(b.date));
+  trip.updatedAt = new Date().toISOString();
+  saveState();
+  renderTrips();
+}
+
+function addStopToDay(event) {
+  event.preventDefault();
+  const trip = getSelectedTrip();
+  const day = trip?.days.find((item) => item.id === event.currentTarget.dataset.dayId);
+  if (!day) return;
+
+  const data = new FormData(event.currentTarget);
+  day.stops.push({
+    id: crypto.randomUUID(),
+    type: String(data.get("type") || "sightseeing"),
+    time: String(data.get("time") || "").trim(),
+    name: String(data.get("name") || "").trim(),
+    address: String(data.get("address") || "").trim(),
+    url: String(data.get("url") || "").trim(),
+    notes: String(data.get("notes") || "").trim(),
+  });
+  day.stops.sort((a, b) => a.time.localeCompare(b.time));
+  trip.updatedAt = new Date().toISOString();
+  saveState();
+  renderTrips();
+}
+
+function deleteHotelFromTrip(hotelId) {
+  const trip = getSelectedTrip();
+  if (!trip) return;
+  trip.hotels = trip.hotels.filter((hotel) => hotel.id !== hotelId);
+  trip.updatedAt = new Date().toISOString();
+  saveState();
+  renderTrips();
+}
+
+function deleteDayFromTrip(dayId) {
+  const trip = getSelectedTrip();
+  if (!trip) return;
+  const confirmed = window.confirm("Delete this day plan?");
+  if (!confirmed) return;
+  trip.days = trip.days.filter((day) => day.id !== dayId);
+  trip.updatedAt = new Date().toISOString();
+  saveState();
+  renderTrips();
+}
+
+function deleteStopFromDay(dayId, stopId) {
+  const trip = getSelectedTrip();
+  const day = trip?.days.find((item) => item.id === dayId);
+  if (!day) return;
+  day.stops = day.stops.filter((stop) => stop.id !== stopId);
+  trip.updatedAt = new Date().toISOString();
+  saveState();
+  renderTrips();
 }
 
 function openLoginDialog(memberId = state.currentMemberId) {
@@ -1030,6 +1432,7 @@ function renderCalendar() {
       .map((date) => {
         const iso = toISODate(date);
         const tasks = state.tasks.filter((task) => task.dueDate === iso);
+        const tripEvents = getTripEventsForDate(iso);
         const outside = date.getMonth() !== visibleMonth.getMonth();
         const isToday = iso === isoToday;
         return `
@@ -1041,6 +1444,15 @@ function renderCalendar() {
                   (task) => `
                     <button class="calendar-task ${task.priority} ${task.status === "done" ? "done" : ""}" type="button" data-task-id="${task.id}" title="${escapeAttribute(task.title)}">
                       ${escapeHTML(task.title)}
+                    </button>
+                  `,
+                )
+                .join("")}
+              ${tripEvents
+                .map(
+                  (event) => `
+                    <button class="calendar-task trip" type="button" data-calendar-trip="${event.tripId}" title="${escapeAttribute(event.title)}">
+                      ${escapeHTML(event.title)}
                     </button>
                   `,
                 )
@@ -1058,6 +1470,14 @@ function renderCalendar() {
       renderTasks();
       renderDetail();
       window.scrollTo({ top: 0, behavior: "smooth" });
+    });
+  });
+
+  elements.calendarGrid.querySelectorAll("[data-calendar-trip]").forEach((button) => {
+    button.addEventListener("click", () => {
+      selectedTripId = button.dataset.calendarTrip;
+      renderTrips();
+      elements.tripDetail.scrollIntoView({ behavior: "smooth", block: "start" });
     });
   });
 }
@@ -1802,6 +2222,75 @@ function closeTaskDialog() {
   elements.taskForm.reset();
 }
 
+function openTripDialog(trip = null) {
+  elements.tripDialogTitle.textContent = trip ? "Edit trip" : "New trip";
+  elements.deleteTripBtn.style.visibility = trip ? "visible" : "hidden";
+
+  tripForm.id.value = trip?.id ?? "";
+  tripForm.title.value = trip?.title ?? "";
+  tripForm.destination.value = trip?.destination ?? "";
+  tripForm.startDate.value = trip?.startDate ?? isoToday;
+  tripForm.endDate.value = trip?.endDate ?? addDays(isoToday, 3);
+  tripForm.notes.value = trip?.notes ?? "";
+
+  elements.tripDialog.showModal();
+  tripForm.title.focus();
+  refreshIcons();
+}
+
+function closeTripDialog() {
+  elements.tripDialog.close();
+  elements.tripForm.reset();
+}
+
+function saveTripFromForm(event) {
+  event.preventDefault();
+  const id = tripForm.id.value || crypto.randomUUID();
+  const existing = state.trips.find((trip) => trip.id === id);
+  const now = new Date().toISOString();
+  const startDate = tripForm.startDate.value;
+  const endDate = tripForm.endDate.value < startDate ? startDate : tripForm.endDate.value;
+  const trip = {
+    id,
+    title: tripForm.title.value.trim(),
+    destination: tripForm.destination.value.trim(),
+    startDate,
+    endDate,
+    notes: tripForm.notes.value.trim(),
+    hotels: existing?.hotels ?? [],
+    days: existing?.days ?? buildDefaultTripDays(startDate, endDate),
+    createdAt: existing?.createdAt ?? now,
+    updatedAt: now,
+  };
+
+  if (existing) {
+    state.trips = state.trips.map((item) => (item.id === id ? trip : item));
+  } else {
+    state.trips.push(trip);
+  }
+
+  state.trips.sort((a, b) => a.startDate.localeCompare(b.startDate));
+  selectedTripId = id;
+  saveState();
+  closeTripDialog();
+  renderTrips();
+}
+
+function deleteCurrentTrip() {
+  const id = tripForm.id.value;
+  if (!id) return;
+  const trip = state.trips.find((item) => item.id === id);
+  if (!trip) return;
+  const confirmed = window.confirm(`Delete "${trip.title}"?`);
+  if (!confirmed) return;
+
+  state.trips = state.trips.filter((item) => item.id !== id);
+  selectedTripId = state.trips[0]?.id ?? null;
+  saveState();
+  closeTripDialog();
+  renderTrips();
+}
+
 function saveTaskFromForm(event) {
   event.preventDefault();
   const id = form.id.value || crypto.randomUUID();
@@ -1960,9 +2449,11 @@ function importState(event) {
         members: normalizeMembers(imported.members),
         tasks: normalizeTasks(imported.tasks),
         notes: normalizeNotes(imported.notes),
+        trips: normalizeTrips(imported.trips),
         currentMemberId: imported.currentMemberId || "me",
       };
       selectedTaskId = state.tasks[0]?.id ?? null;
+      selectedTripId = state.trips[0]?.id ?? null;
       saveState();
       render();
     } catch (error) {
@@ -1982,6 +2473,28 @@ function changeMonth(delta) {
 
 function getSelectedTask() {
   return state.tasks.find((task) => task.id === selectedTaskId) ?? null;
+}
+
+function getSelectedTrip() {
+  return state.trips.find((trip) => trip.id === selectedTripId) ?? null;
+}
+
+function getTripEventsForDate(dateString) {
+  return state.trips.flatMap((trip) => {
+    const events = [];
+    if (dateString === trip.startDate) {
+      events.push({ tripId: trip.id, title: `Trip starts: ${trip.title}` });
+    }
+    if (dateString === trip.endDate && trip.endDate !== trip.startDate) {
+      events.push({ tripId: trip.id, title: `Trip ends: ${trip.title}` });
+    }
+    trip.days
+      .filter((day) => day.date === dateString)
+      .forEach((day) => {
+        events.push({ tripId: trip.id, title: day.title || `${trip.title} plan` });
+      });
+    return events;
+  });
 }
 
 function getNotebookNotes(memberId = state.currentMemberId) {
@@ -2012,6 +2525,29 @@ function getDueState(task) {
   if (diff < 0) return "overdue";
   if (diff <= 3) return "soon";
   return "";
+}
+
+function buildDefaultTripDays(startDate, endDate) {
+  const days = [];
+  let current = startDate;
+  while (current <= endDate && days.length < 21) {
+    days.push({
+      id: crypto.randomUUID(),
+      date: current,
+      title: "",
+      notes: "",
+      stops: [],
+    });
+    current = addDays(current, 1);
+  }
+  return days;
+}
+
+function nextTripDayDate(trip) {
+  if (!trip.days.length) return trip.startDate;
+  const last = trip.days[trip.days.length - 1].date;
+  const next = addDays(last, 1);
+  return next <= trip.endDate ? next : trip.endDate;
 }
 
 function formatDuePhrase(dateString) {
@@ -2049,6 +2585,17 @@ function addDays(dateString, amount) {
 
 function formatShortDate(dateString) {
   return parseLocalDate(dateString).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
+function formatTripRange(trip) {
+  if (trip.startDate === trip.endDate) return formatLongDate(trip.startDate);
+  return `${formatShortDate(trip.startDate)} - ${formatShortDate(trip.endDate)}`;
+}
+
+function formatStayRange(hotel) {
+  if (!hotel.checkIn && !hotel.checkOut) return "Dates not set";
+  if (hotel.checkIn && hotel.checkOut) return `${formatShortDate(hotel.checkIn)} - ${formatShortDate(hotel.checkOut)}`;
+  return hotel.checkIn ? `Check in ${formatShortDate(hotel.checkIn)}` : `Check out ${formatShortDate(hotel.checkOut)}`;
 }
 
 function formatLongDate(dateString) {
@@ -2127,6 +2674,57 @@ function nextStatusIcon(status) {
     assigned: "check",
     done: "check-check",
   }[status];
+}
+
+function tripStopTypeLabel(type) {
+  return {
+    sightseeing: "Sightseeing",
+    food: "Food",
+    hotel: "Hotel",
+    drive: "Drive",
+    other: "Other",
+  }[type] || "Stop";
+}
+
+function renderMapLinks(query, label = "Map") {
+  if (!query) return "";
+  return `
+    <a class="secondary-button" href="${escapeAttribute(appleMapsUrl(query))}" target="_blank" rel="noreferrer"><i data-lucide="map"></i>Apple</a>
+    <a class="secondary-button" href="${escapeAttribute(googleMapsSearchUrl(query))}" target="_blank" rel="noreferrer"><i data-lucide="map-pin"></i>Google</a>
+  `;
+}
+
+function renderDayMapLinks(day) {
+  const points = day.stops.map((stop) => stop.address || stop.name).filter(Boolean);
+  if (!points.length) return "";
+  if (points.length === 1) return renderMapLinks(points[0], "Day map");
+
+  return `
+    <a class="secondary-button" href="${escapeAttribute(googleMapsRouteUrl(points))}" target="_blank" rel="noreferrer"><i data-lucide="route"></i>Google route</a>
+    <a class="secondary-button" href="${escapeAttribute(appleMapsUrl(points[0]))}" target="_blank" rel="noreferrer"><i data-lucide="map"></i>Apple first stop</a>
+  `;
+}
+
+function appleMapsUrl(query) {
+  return `https://maps.apple.com/?q=${encodeURIComponent(query)}`;
+}
+
+function googleMapsSearchUrl(query) {
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
+}
+
+function googleMapsRouteUrl(points) {
+  const origin = points[0];
+  const destination = points[points.length - 1];
+  const waypoints = points.slice(1, -1).join("|");
+  const params = new URLSearchParams({
+    api: "1",
+    origin,
+    destination,
+    travelmode: "driving",
+  });
+  if (waypoints) params.set("waypoints", waypoints);
+  return `https://www.google.com/maps/dir/?${params.toString()}`;
 }
 
 function openMail(to, subject, body) {
