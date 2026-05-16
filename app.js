@@ -337,6 +337,11 @@ function bindEvents() {
 
   elements.assistantForm.addEventListener("submit", askAssistant);
   elements.assistantClearBtn.addEventListener("click", resetAssistant);
+  elements.assistantInput.addEventListener("keydown", (event) => {
+    if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+      elements.assistantForm.requestSubmit();
+    }
+  });
 }
 
 function registerServiceWorker() {
@@ -1181,7 +1186,7 @@ function resetAssistant() {
   elements.assistantChat.innerHTML = "";
   addAssistantMessage(
     "assistant",
-    "Ask me about tasks, owners, due dates, overdue work, unassigned items, notes, or a family member's summary.",
+    "Ask me about tasks, owners, due dates, overdue work, unassigned items, notes, or paste a rough list to create tasks.",
   );
 }
 
@@ -1190,7 +1195,7 @@ function renderAssistantSuggestions() {
     "What is due this week?",
     "Who has overdue tasks?",
     "Show unassigned tasks",
-    "Create task from my notes",
+    "Create tasks: Dentist appointment tomorrow",
   ];
 
   elements.assistantSuggestions.innerHTML = suggestions
@@ -1243,6 +1248,10 @@ function answerFamilyQuestion(question) {
   if (mentionsTaskCreationFromNote(normalized)) {
     const member = person || currentMember();
     return createTaskFromNotebookQuestion(normalized, member);
+  }
+
+  if (mentionsRoughTaskCreation(question, normalized)) {
+    return createTasksFromRoughList(question);
   }
 
   if (mentionsNotebook(normalized)) {
@@ -1361,6 +1370,83 @@ function createTaskFromNotebookQuestion(text, member) {
   return `Created task: ${task.title}\nDue: ${formatLongDate(task.dueDate)}\nRequested by: ${member.name}\nAssigned to: Unassigned`;
 }
 
+function createTasksFromRoughList(question) {
+  const drafts = parseRoughTaskList(question);
+  if (!drafts.length) {
+    return "Paste one task per line with a date, like:\n- Dentist appointment 5/20\n- Vivan driving practice tomorrow\n- Buy birthday gift by May 30";
+  }
+
+  const now = new Date().toISOString();
+  const tasks = drafts.map((draft) => buildTaskFromDraft(draft, now));
+  state.tasks.unshift(...tasks);
+  selectedTaskId = tasks[0].id;
+  saveState();
+  render();
+
+  const defaulted = drafts.filter((draft) => draft.usedDefaultDate).length;
+  const defaultNote = defaulted ? `\n\n${defaulted} item${defaulted === 1 ? "" : "s"} had no date, so I used ${formatLongDate(addDays(isoToday, 7))}.` : "";
+  return `Created ${tasks.length} task${tasks.length === 1 ? "" : "s"} and added them to the calendar:\n\n${formatTaskLines(tasks)}${defaultNote}`;
+}
+
+function parseRoughTaskList(question) {
+  return question
+    .replace(/\r/g, "")
+    .split(/\n|;/)
+    .map((line) => parseRoughTaskLine(line))
+    .filter(Boolean);
+}
+
+function parseRoughTaskLine(line) {
+  const original = line.trim();
+  if (!original) return null;
+
+  const withoutBullet = original.replace(/^\s*(?:[-*]|\d+[.)]|\[[ x]\])\s*/i, "").trim();
+  const commandOnly = /^(create|make|add|turn|convert|schedule|plan)?\s*(tasks?|todos?|to dos?|calendar|list)\s*:?\s*$/i.test(withoutBullet);
+  if (commandOnly) return null;
+
+  const dateResult = extractDueDateFromLine(withoutBullet);
+  const directiveOnly =
+    dateResult.usedDefaultDate &&
+    /^(create|make|add|turn|convert|schedule|plan)\b/i.test(withoutBullet) &&
+    /\b(tasks?|todos?|to dos?|calendar|schedule|list)\b/i.test(withoutBullet);
+  if (directiveOnly) return null;
+
+  const title = cleanRoughTaskTitle(dateResult.titleText);
+  if (!title || title.length < 2) return null;
+
+  return {
+    title,
+    dueDate: dateResult.dueDate,
+    usedDefaultDate: dateResult.usedDefaultDate,
+    assignee: findAssignedMemberFromLine(withoutBullet)?.id || "",
+    original,
+  };
+}
+
+function buildTaskFromDraft(draft, now) {
+  return {
+    id: crypto.randomUUID(),
+    title: draft.title,
+    type: inferTaskType(draft.title),
+    status: "todo",
+    requester: state.currentMemberId,
+    assignee: draft.assignee,
+    dueDate: draft.dueDate,
+    priority: "normal",
+    description: `Created by Family Hub Assistant from rough list:\n\n${draft.original}`,
+    comments: [
+      {
+        id: crypto.randomUUID(),
+        author: state.currentMemberId,
+        createdAt: now,
+        text: "Created by Family Hub Assistant from a rough task list.",
+      },
+    ],
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
 function buildTaskFromNote(note, member, question) {
   const now = new Date().toISOString();
   return {
@@ -1397,10 +1483,129 @@ function deriveTaskTitleFromNote(text) {
 }
 
 function deriveDueDateFromQuestion(text) {
-  if (mentionsToday(text)) return isoToday;
-  if (mentionsTomorrow(text)) return addDays(isoToday, 1);
-  if (mentionsWeek(text)) return addDays(isoToday, 7);
+  const parsed = parseDueDateText(text);
+  if (parsed) return parsed.dueDate;
   return addDays(isoToday, 7);
+}
+
+function extractDueDateFromLine(line) {
+  const parsed = parseDueDateText(line);
+  if (!parsed) {
+    return {
+      dueDate: addDays(isoToday, 7),
+      titleText: line,
+      usedDefaultDate: true,
+    };
+  }
+
+  return {
+    dueDate: parsed.dueDate,
+    titleText: line.replace(parsed.match, " "),
+    usedDefaultDate: false,
+  };
+}
+
+function parseDueDateText(text) {
+  const relative = text.match(/\b(?:due|by|on)?\s*(today|tomorrow|next week|this week)\b/i);
+  if (relative) {
+    return {
+      dueDate:
+        {
+          today: isoToday,
+          tomorrow: addDays(isoToday, 1),
+          "this week": addDays(isoToday, 7),
+          "next week": addDays(isoToday, 7),
+        }[relative[1].toLowerCase()] || addDays(isoToday, 7),
+      match: relative[0],
+    };
+  }
+
+  const iso = text.match(/\b(?:due|by|on)?\s*(\d{4})-(\d{1,2})-(\d{1,2})\b/i);
+  if (iso) {
+    const dueDate = datePartsToISO(Number(iso[1]), Number(iso[2]), Number(iso[3]), true);
+    if (dueDate) return { dueDate, match: iso[0] };
+  }
+
+  const numeric = text.match(/\b(?:due|by|on)?\s*(\d{1,2})[\/.-](\d{1,2})(?:[\/.-](\d{2,4}))?\b/i);
+  if (numeric) {
+    const year = numeric[3] ? normalizeYear(Number(numeric[3])) : null;
+    const dueDate = datePartsToISO(year, Number(numeric[1]), Number(numeric[2]), Boolean(year));
+    if (dueDate) return { dueDate, match: numeric[0] };
+  }
+
+  const monthFirst = text.match(
+    /\b(?:due|by|on)?\s*(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\.?\s+(\d{1,2})(?:,?\s+(\d{2,4}))?\b/i,
+  );
+  if (monthFirst) {
+    const year = monthFirst[3] ? normalizeYear(Number(monthFirst[3])) : null;
+    const dueDate = datePartsToISO(year, monthNameToNumber(monthFirst[1]), Number(monthFirst[2]), Boolean(year));
+    if (dueDate) return { dueDate, match: monthFirst[0] };
+  }
+
+  const dayFirst = text.match(
+    /\b(?:due|by|on)?\s*(\d{1,2})\s+(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)(?:\.|,)?(?:\s+(\d{2,4}))?\b/i,
+  );
+  if (dayFirst) {
+    const year = dayFirst[3] ? normalizeYear(Number(dayFirst[3])) : null;
+    const dueDate = datePartsToISO(year, monthNameToNumber(dayFirst[2]), Number(dayFirst[1]), Boolean(year));
+    if (dueDate) return { dueDate, match: dayFirst[0] };
+  }
+
+  return null;
+}
+
+function datePartsToISO(year, month, day, hasExplicitYear) {
+  if (!month || !day || month < 1 || month > 12 || day < 1 || day > 31) return "";
+
+  const base = parseLocalDate(isoToday);
+  const resolvedYear = year || base.getFullYear();
+  const candidate = new Date(resolvedYear, month - 1, day);
+  if (candidate.getFullYear() !== resolvedYear || candidate.getMonth() !== month - 1 || candidate.getDate() !== day) {
+    return "";
+  }
+
+  if (!hasExplicitYear && candidate < base) {
+    candidate.setFullYear(candidate.getFullYear() + 1);
+  }
+
+  return toISODate(candidate);
+}
+
+function normalizeYear(year) {
+  if (year < 100) return year + 2000;
+  return year;
+}
+
+function monthNameToNumber(name) {
+  const month = name.toLowerCase().slice(0, 3);
+  return ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"].indexOf(month) + 1;
+}
+
+function cleanRoughTaskTitle(text) {
+  return text
+    .replace(/^\s*(?:create|make|add|schedule|plan)\s+(?:a\s+)?(?:tasks?|todos?|to dos?|calendar|schedule|list)\s*:?\s*/i, "")
+    .replace(/\b(?:due|by|on)\b/gi, " ")
+    .replace(/\s*[-:|]\s*$/g, "")
+    .replace(/\s{2,}/g, " ")
+    .trim()
+    .slice(0, 90);
+}
+
+function findAssignedMemberFromLine(line) {
+  const normalized = line.toLowerCase();
+  return state.members.find((member) => {
+    const name = member.name.toLowerCase();
+    return (
+      normalized.includes(`@${name}`) ||
+      normalized.startsWith(`${name}:`) ||
+      normalized.includes(`assign to ${name}`) ||
+      normalized.includes(`assigned to ${name}`)
+    );
+  });
+}
+
+function inferTaskType(title) {
+  return title.toLowerCase().includes("appointment") ? "appointment" : "todo";
 }
 
 function formatPersonSummary(member, tasks) {
@@ -1489,6 +1694,28 @@ function mentionsTaskCreationFromNote(text) {
   return wantsTask && wantsNote && wantsCreate;
 }
 
+function mentionsRoughTaskCreation(rawText, text) {
+  if (mentionsNotebook(text)) return false;
+
+  const wantsTask =
+    text.includes("task") ||
+    text.includes("tasks") ||
+    text.includes("todo") ||
+    text.includes("to do") ||
+    text.includes("calendar") ||
+    text.includes("schedule");
+  const wantsCreate =
+    text.includes("create") ||
+    text.includes("make") ||
+    text.includes("add") ||
+    text.includes("schedule") ||
+    text.includes("plan");
+  const drafts = parseRoughTaskList(rawText);
+  const hasListShape = rawText.includes("\n") || rawText.includes(";") || /:\s*\S/.test(rawText);
+  const hasDate = drafts.some((draft) => !draft.usedDefaultDate);
+  return wantsTask && wantsCreate && drafts.length > 0 && (hasListShape || hasDate);
+}
+
 function assistantStopWords() {
   return new Set([
     "what",
@@ -1508,6 +1735,11 @@ function assistantStopWords() {
     "task",
     "tasks",
     "todo",
+    "todos",
+    "calendar",
+    "schedule",
+    "list",
+    "these",
     "due",
     "date",
     "owner",

@@ -930,13 +930,14 @@ label.import-button {
   gap: 8px;
 }
 
-.assistant-form input {
+.assistant-form textarea {
   width: 100%;
-  min-height: 42px;
-  padding: 0 10px;
+  min-height: 86px;
+  padding: 10px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: white;
+  resize: vertical;
 }
 
 .assistant-suggestions {
