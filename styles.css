@@ -30,6 +30,7 @@ body {
   font-family:
     Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
     sans-serif;
+  -webkit-text-size-adjust: 100%;
 }
 
 button,
@@ -1312,6 +1313,12 @@ label.import-button {
 }
 
 @media (max-width: 760px) {
+  body {
+    background:
+      linear-gradient(180deg, rgba(15, 118, 110, 0.06), transparent 220px),
+      var(--bg);
+  }
+
   .app-header,
   .panel-heading,
   .dialog-heading {
@@ -1319,14 +1326,91 @@ label.import-button {
     flex-direction: column;
   }
 
+  .app-header {
+    gap: 14px;
+    padding: 18px max(14px, env(safe-area-inset-right)) 12px max(14px, env(safe-area-inset-left));
+  }
+
+  .app-header h1 {
+    font-size: 2.2rem;
+    line-height: 1;
+  }
+
   .header-actions {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 8px;
+    overflow: visible;
+    padding-bottom: 0;
+  }
+
+  .header-actions .cloud-button,
+  .header-actions .profile-button,
+  .header-actions .secondary-button,
+  .header-actions .primary-button,
+  .header-actions .icon-button,
+  .header-actions .import-button {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .header-actions .profile-button,
+  .header-actions .primary-button {
+    grid-column: span 2;
+  }
+
+  .profile-button {
     justify-content: flex-start;
-    overflow-x: auto;
-    padding-bottom: 2px;
+  }
+
+  .app-shell {
+    gap: 12px;
+    padding: 0 max(12px, env(safe-area-inset-right)) calc(24px + env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
   }
 
   .member-strip {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .member-tile {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    gap: 8px;
+    min-height: 104px;
+    padding: 10px 8px;
+    text-align: center;
+  }
+
+  .member-tile .avatar {
+    width: 38px;
+    height: 38px;
+  }
+
+  .member-tile span {
+    font-size: 0.78rem;
+    line-height: 1.25;
+  }
+
+  .task-panel,
+  .wishlist-panel,
+  .travel-panel,
+  .detail-panel,
+  .calendar-panel,
+  .reminder-panel,
+  .notebook-panel,
+  .assistant-panel {
+    padding: 14px;
+    box-shadow: 0 8px 24px rgba(24, 33, 47, 0.06);
+  }
+
+  .panel-heading {
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+
+  .panel-heading .primary-button {
+    width: 100%;
   }
 
   .panel-heading .search-control {
@@ -1347,12 +1431,59 @@ label.import-button {
     width: 100%;
   }
 
+  .task-row {
+    grid-template-columns: 1fr;
+    gap: 10px;
+    padding: 12px;
+  }
+
+  .date-pill {
+    justify-self: start;
+  }
+
+  .segmented-control {
+    gap: 4px;
+  }
+
+  .segment {
+    padding: 8px 10px;
+  }
+
   .trip-hero,
   .trip-day-heading,
   .hotel-card,
   .stop-card {
     grid-template-columns: 1fr;
     flex-direction: column;
+  }
+
+  .detail-actions,
+  .dialog-actions,
+  .calendar-controls {
+    align-items: stretch;
+  }
+
+  .detail-actions .secondary-button,
+  .detail-actions .chip-button,
+  .dialog-actions .primary-button,
+  .dialog-actions .secondary-button {
+    flex: 1 1 auto;
+  }
+
+  #deleteTaskBtn,
+  #deleteTripBtn,
+  #deleteWishBtn {
+    margin-right: 0;
+  }
+
+  .travel-form {
+    padding: 8px;
+  }
+
+  .travel-form button,
+  .notebook-form .primary-button,
+  .assistant-form .primary-button {
+    width: 100%;
   }
 
   .calendar {
@@ -1382,15 +1513,36 @@ label.import-button {
   .calendar-items {
     margin-top: 0;
   }
+
+  .assistant-chat {
+    min-height: 180px;
+    max-height: 300px;
+  }
+
+  .task-dialog {
+    width: calc(100vw - 16px);
+    max-height: calc(100dvh - 16px);
+  }
+
+  .task-dialog form {
+    gap: 12px;
+    padding: 14px;
+  }
+
+  .task-dialog input,
+  .task-dialog select,
+  .task-dialog textarea,
+  .comment-form input,
+  .comment-form select,
+  .notebook-form textarea,
+  .assistant-form textarea {
+    font-size: 16px;
+  }
 }
 
 @media (max-width: 460px) {
   .app-header h1 {
     font-size: 2rem;
-  }
-
-  .member-strip {
-    grid-template-columns: 1fr;
   }
 
   .primary-button,
@@ -1399,6 +1551,21 @@ label.import-button {
   }
 
   .calendar-controls {
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: 44px 1fr 44px;
+    gap: 8px;
+  }
+
+  .calendar-controls .icon-button {
+    width: 100%;
+  }
+
+  .assistant-suggestions {
+    display: grid;
+  }
+
+  .assistant-suggestion {
+    justify-content: flex-start;
+    text-align: left;
   }
 }
