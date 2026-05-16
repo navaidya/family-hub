@@ -1465,7 +1465,8 @@ function renderGoogleMapsImportForm(trip) {
           <option value="">New sightseeing day</option>
           ${dayOptions}
         </select>
-        <textarea name="places" rows="4" required placeholder="Paste Google Maps list places or exported CSV"></textarea>
+        <textarea name="places" rows="4" required placeholder="Paste copied Google Maps place rows, one place per line, or exported CSV"></textarea>
+        <p class="maps-import-help">Copy the place rows from Google Maps or paste a Takeout export. A share link alone does not expose the saved places to Family Hub.</p>
         <button class="secondary-button" type="submit"><i data-lucide="plus"></i>Add to trip</button>
       </form>
     </details>
@@ -4469,14 +4470,37 @@ function parseImportedMapPlaces(value) {
   const delimitedPlaces = parseDelimitedMapPlaces(text);
   if (delimitedPlaces.length) return dedupeImportedPlaces(delimitedPlaces);
 
-  const places = text
+  const lines = text
     .split(/\n+/)
     .map((line) => cleanImportedPlaceLine(line))
-    .filter((line) => line && !isImportedPlaceNoise(line))
+    .filter(Boolean);
+
+  const copiedGooglePlaces = parseCopiedGoogleMapsList(lines);
+  if (copiedGooglePlaces.length) return dedupeImportedPlaces(copiedGooglePlaces);
+
+  const places = lines
+    .filter((line) => !isImportedPlaceNoise(line))
     .map((line) => parseImportedPlaceLine(line))
     .filter((place) => place.name);
 
   return dedupeImportedPlaces(places);
+}
+
+function parseCopiedGoogleMapsList(lines) {
+  const places = [];
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index];
+    const nextLine = lines[index + 1] || "";
+    if (isImportedPlaceNoise(line)) continue;
+
+    if (isGoogleMapsRatingLine(nextLine)) {
+      places.push({ name: line, address: "", url: "" });
+      index += 1;
+      if (lines[index + 1] && !isImportedPlaceNoise(lines[index + 1])) index += 1;
+      if (lines[index + 1] && isImportedPlaceNoise(lines[index + 1])) index += 1;
+    }
+  }
+  return places;
 }
 
 function parseDelimitedMapPlaces(text) {
@@ -4547,13 +4571,17 @@ function parseImportedPlaceLine(line) {
 
 function cleanImportedPlaceLine(line) {
   return String(line || "")
-    .replace(/^\s*[-*•\d.)]+\s*/, "")
+    .replace(/^\s*(?:[-*•]\s*|\d+[.)]\s+)/, "")
     .replace(/\s+/g, " ")
     .trim();
 }
 
 function isImportedPlaceNoise(line) {
-  return /^(google maps|saved places|directions|share|save|nearby|send to phone|copy link|add note|website|call|closed|open now)$/i.test(line);
+  return /^(\+\s*)?(google maps|saved places|directions|share|save|nearby|send to phone|copy link|add note|note|website|call|closed|open now)$/i.test(line);
+}
+
+function isGoogleMapsRatingLine(line) {
+  return /^\d(?:\.\d)?\s*★?\s*\([0-9,]+\)/.test(String(line || "").trim());
 }
 
 function dedupeImportedPlaces(places) {
