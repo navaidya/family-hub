@@ -1376,6 +1376,7 @@ function renderTripDetail() {
         <div class="section-heading-inline">
           <h3>Daily plans</h3>
         </div>
+        ${renderGoogleMapsImportForm(trip)}
         ${renderTripDayForm(trip)}
         <div class="trip-day-list">${dayCards}</div>
       </section>
@@ -1385,6 +1386,7 @@ function renderTripDetail() {
   elements.tripDetail.querySelector("[data-trip-edit]").addEventListener("click", () => openTripDialog(trip));
   elements.tripDetail.querySelector("[data-hotel-form]").addEventListener("submit", addHotelToTrip);
   elements.tripDetail.querySelector("[data-day-form]").addEventListener("submit", addDayToTrip);
+  elements.tripDetail.querySelector("[data-google-maps-import]").addEventListener("submit", importGoogleMapsPlaces);
   elements.tripDetail.querySelectorAll("[data-hotel-delete]").forEach((button) => {
     button.addEventListener("click", () => deleteHotelFromTrip(button.dataset.hotelDelete));
   });
@@ -1440,6 +1442,26 @@ function renderTripDayForm(trip) {
       <input name="title" maxlength="80" placeholder="Day title, e.g. Beach and Old Town" />
       <input name="notes" maxlength="180" placeholder="Per-day plan notes" />
       <button class="secondary-button" type="submit"><i data-lucide="calendar-plus"></i>Add day</button>
+    </form>
+  `;
+}
+
+function renderGoogleMapsImportForm(trip) {
+  const dayOptions = trip.days
+    .map(
+      (day, index) =>
+        `<option value="${escapeAttribute(day.id)}">${escapeHTML(day.title || `Day ${index + 1}`)} · ${formatShortDate(day.date)}</option>`,
+    )
+    .join("");
+
+  return `
+    <form class="travel-form maps-import-form" data-google-maps-import data-trip-id="${escapeAttribute(trip.id)}">
+      <select name="dayId">
+        <option value="">New sightseeing day</option>
+        ${dayOptions}
+      </select>
+      <textarea name="places" rows="4" required placeholder="Paste Google Maps list places or exported CSV"></textarea>
+      <button class="secondary-button" type="submit"><i data-lucide="list-plus"></i>Import places</button>
     </form>
   `;
 }
@@ -1542,6 +1564,66 @@ function addDayToTrip(event) {
   trip.updatedAt = new Date().toISOString();
   saveState();
   renderTrips();
+}
+
+function importGoogleMapsPlaces(event) {
+  event.preventDefault();
+  const trip = getSelectedTrip();
+  if (!trip) return;
+
+  const data = new FormData(event.currentTarget);
+  const importedPlaces = parseImportedMapPlaces(data.get("places"));
+  if (!importedPlaces.length) {
+    window.alert("No places found to import.");
+    return;
+  }
+
+  const selectedDayId = String(data.get("dayId") || "");
+  let day = trip.days.find((item) => item.id === selectedDayId);
+  if (!day) {
+    day = {
+      id: crypto.randomUUID(),
+      date: nextTripDayDate(trip),
+      title: "Sightseeing",
+      notes: "",
+      stops: [],
+    };
+    trip.days.push(day);
+    trip.days.sort((a, b) => a.date.localeCompare(b.date));
+  }
+
+  const existingStops = new Set(
+    trip.days.flatMap((tripDay) =>
+      tripDay.stops.map((stop) => normalizeMapPlaceKey(stop.name, stop.address)),
+    ),
+  );
+  const stops = importedPlaces
+    .filter((place) => {
+      const key = normalizeMapPlaceKey(place.name, place.address);
+      if (existingStops.has(key)) return false;
+      existingStops.add(key);
+      return true;
+    })
+    .map((place) => ({
+      id: crypto.randomUUID(),
+      type: "sightseeing",
+      name: place.name,
+      address: place.address,
+      time: "",
+      url: place.url,
+      notes: "",
+    }));
+
+  if (!stops.length) {
+    window.alert("Those places are already in this trip.");
+    return;
+  }
+
+  day.stops.push(...stops);
+  trip.updatedAt = new Date().toISOString();
+  saveState();
+  renderTrips();
+  window.alert(`Imported ${stops.length} sightseeing place${stops.length === 1 ? "" : "s"}.`);
 }
 
 function addStopToDay(event) {
@@ -4359,6 +4441,126 @@ function dedupeMapPoints(points) {
       seen.add(key);
       return true;
     });
+}
+
+function parseImportedMapPlaces(value) {
+  const text = String(value || "").trim();
+  if (!text) return [];
+
+  const delimitedPlaces = parseDelimitedMapPlaces(text);
+  if (delimitedPlaces.length) return dedupeImportedPlaces(delimitedPlaces);
+
+  const places = text
+    .split(/\n+/)
+    .map((line) => cleanImportedPlaceLine(line))
+    .filter((line) => line && !isImportedPlaceNoise(line))
+    .map((line) => parseImportedPlaceLine(line))
+    .filter((place) => place.name);
+
+  return dedupeImportedPlaces(places);
+}
+
+function parseDelimitedMapPlaces(text) {
+  const lines = text
+    .split(/\n+/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  if (lines.length < 2) return [];
+
+  const delimiter = lines[0].includes("\t") ? "\t" : ",";
+  if (!lines[0].includes(delimiter)) return [];
+
+  const headers = splitDelimitedLine(lines[0], delimiter).map((header) => header.trim().toLowerCase());
+  const nameIndex = findHeaderIndex(headers, ["name", "title", "place", "place name", "saved place"]);
+  const addressIndex = findHeaderIndex(headers, ["address", "location", "full address", "formatted address"]);
+  const urlIndex = headers.findIndex((header) => header.includes("url") || header.includes("link") || header.includes("maps"));
+  if (nameIndex < 0 && addressIndex < 0) return [];
+
+  return lines.slice(1).map((line) => {
+    const row = splitDelimitedLine(line, delimiter);
+    const name = cleanImportedPlaceLine(row[nameIndex] || row[addressIndex] || row[0] || "");
+    const address = cleanImportedPlaceLine(addressIndex >= 0 && addressIndex !== nameIndex ? row[addressIndex] : "");
+    const url = normalizeImportedUrl(urlIndex >= 0 ? row[urlIndex] : "");
+    return { name, address, url };
+  });
+}
+
+function splitDelimitedLine(line, delimiter) {
+  if (delimiter === "\t") return line.split("\t");
+
+  const cells = [];
+  let cell = "";
+  let quoted = false;
+  for (const char of line) {
+    if (char === '"') {
+      quoted = !quoted;
+    } else if (char === delimiter && !quoted) {
+      cells.push(cell.trim());
+      cell = "";
+    } else {
+      cell += char;
+    }
+  }
+  cells.push(cell.trim());
+  return cells.map((item) => item.replace(/^"|"$/g, "").replaceAll('""', '"'));
+}
+
+function findHeaderIndex(headers, candidates) {
+  return headers.findIndex((header) => candidates.some((candidate) => header === candidate || header.includes(candidate)));
+}
+
+function parseImportedPlaceLine(line) {
+  const url = normalizeImportedUrl(line.match(/https?:\/\/\S+/)?.[0] || "");
+  const withoutUrl = cleanImportedPlaceLine(line.replace(/https?:\/\/\S+/g, ""));
+  const separator = [" - ", " — ", " – ", " | ", "\t"].find((item) => withoutUrl.includes(item));
+  if (!separator) return { name: withoutUrl, address: "", url };
+
+  const parts = withoutUrl
+    .split(separator)
+    .map((part) => cleanImportedPlaceLine(part))
+    .filter(Boolean);
+  return {
+    name: parts[0] || withoutUrl,
+    address: parts.slice(1).join(", "),
+    url,
+  };
+}
+
+function cleanImportedPlaceLine(line) {
+  return String(line || "")
+    .replace(/^\s*[-*•\d.)]+\s*/, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function isImportedPlaceNoise(line) {
+  return /^(google maps|saved places|directions|share|save|nearby|send to phone|copy link|add note|website|call|closed|open now)$/i.test(line);
+}
+
+function dedupeImportedPlaces(places) {
+  const seen = new Set();
+  return places
+    .map((place) => ({
+      name: cleanImportedPlaceLine(place.name),
+      address: cleanImportedPlaceLine(place.address),
+      url: normalizeImportedUrl(place.url),
+    }))
+    .filter((place) => place.name && !isImportedPlaceNoise(place.name))
+    .filter((place) => {
+      const key = normalizeMapPlaceKey(place.name, place.address);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+}
+
+function normalizeMapPlaceKey(name, address) {
+  return `${String(name || "").trim()}|${String(address || "").trim()}`.toLowerCase();
+}
+
+function normalizeImportedUrl(url) {
+  const cleaned = String(url || "").trim();
+  return /^https?:\/\//i.test(cleaned) ? cleaned : "";
 }
 
 function appleMapsUrl(query) {

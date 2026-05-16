@@ -935,7 +935,8 @@ label.import-button {
 }
 
 .travel-form input,
-.travel-form select {
+.travel-form select,
+.travel-form textarea {
   min-width: 0;
   min-height: 40px;
   padding: 0 10px;
@@ -944,8 +945,18 @@ label.import-button {
   background: white;
 }
 
+.travel-form textarea {
+  padding: 10px;
+  resize: vertical;
+}
+
 .travel-form button {
   justify-self: start;
+}
+
+.maps-import-form {
+  grid-template-columns: minmax(150px, 0.32fr) minmax(0, 1fr) auto;
+  align-items: start;
 }
 
 .stop-card.food {
