@@ -42,6 +42,58 @@ const mainViews = [
   { id: "finance", label: "Finance", icon: "wallet-cards" },
 ];
 
+const defaultCreditCards = [
+  {
+    id: "boa-customized-cash",
+    issuer: "Bank of America",
+    name: "Customized Cash Rewards",
+    recommendedUsage:
+      "Use for the 3% choice category you select in Bank of America, especially online shopping if that is your active category. Also useful for grocery stores and wholesale clubs at 2% until the quarterly combined cap.",
+  },
+  {
+    id: "boa-travel-rewards",
+    issuer: "Bank of America",
+    name: "Travel Rewards",
+    recommendedUsage:
+      "Use for foreign travel or international purchases because it has no foreign transaction fees. Good simple backup travel card when you want flexible travel or dining statement credits.",
+  },
+  {
+    id: "boa-unlimited-cash",
+    issuer: "Bank of America",
+    name: "Unlimited Cash Rewards",
+    recommendedUsage:
+      "Use as a catch-all for purchases that do not earn a stronger category bonus on another card. Especially useful if Preferred Rewards boosts your flat cash-back rate.",
+  },
+  {
+    id: "amex-blue-cash-preferred",
+    issuer: "American Express",
+    name: "Blue Cash Preferred",
+    recommendedUsage:
+      "Use for U.S. supermarkets, select U.S. streaming subscriptions, U.S. gas stations, and transit. Best for family groceries and streaming bills before the supermarket annual cap.",
+  },
+  {
+    id: "chase-prime-visa",
+    issuer: "Chase",
+    name: "Prime Visa",
+    recommendedUsage:
+      "Use for Amazon, Amazon Fresh, Whole Foods, and Chase Travel with an eligible Prime membership. Also a solid option for restaurants, gas, and local transit if no better card applies.",
+  },
+  {
+    id: "booking-genius-visa",
+    issuer: "Booking.com / First Electronic Bank",
+    name: "Genius Rewards Visa",
+    recommendedUsage:
+      "Use for Booking.com app stays and Booking.com travel bookings when you want Booking.com travel credits. Also useful for dining, gas, groceries, and eligible in-trip purchases.",
+  },
+  {
+    id: "rei-coop-mastercard",
+    issuer: "Capital One",
+    name: "REI Co-op Mastercard",
+    recommendedUsage:
+      "Use for REI Co-op purchases. Use elsewhere only if you want rewards as REI value; your flat cash-back cards may be simpler for general spending.",
+  },
+];
+
 const familyMembers = [
   {
     id: "me",
@@ -143,6 +195,7 @@ const elements = {
   financeCalendarGrid: document.querySelector("#financeCalendarGrid"),
   financeProcessStatus: document.querySelector("#financeProcessStatus"),
   financeExpenseList: document.querySelector("#financeExpenseList"),
+  financeCreditCardList: document.querySelector("#financeCreditCardList"),
   statusTabs: document.querySelector("#statusTabs"),
   taskList: document.querySelector("#taskList"),
   taskDetail: document.querySelector("#taskDetail"),
@@ -270,6 +323,7 @@ function loadState() {
         trips: normalizeTrips(parsed.trips),
         wishes: normalizeWishes(parsed.wishes),
         expenses: normalizeExpenses(parsed.expenses),
+        creditCards: normalizeCreditCards(parsed.creditCards),
         currentMemberId: localStorage.getItem(LOCAL_PROFILE_KEY) || parsed.currentMemberId || "me",
       };
     } catch (error) {
@@ -284,6 +338,7 @@ function loadState() {
     trips: normalizeTrips(),
     wishes: normalizeWishes(),
     expenses: normalizeExpenses(),
+    creditCards: normalizeCreditCards(),
     currentMemberId: localStorage.getItem(LOCAL_PROFILE_KEY) || "me",
   };
 }
@@ -457,6 +512,18 @@ function normalizeExpenses(expenses = []) {
       if (dateDiff !== 0) return dateDiff;
       return b.updatedAt.localeCompare(a.updatedAt);
     });
+}
+
+function normalizeCreditCards(savedCards = []) {
+  return defaultCreditCards.map((defaultCard) => {
+    const saved = Array.isArray(savedCards) ? savedCards.find((card) => card.id === defaultCard.id) : null;
+    return {
+      ...defaultCard,
+      billAmount: normalizeExpenseAmount(saved?.billAmount),
+      dueDate: saved?.dueDate || "",
+      updatedAt: saved?.updatedAt || "",
+    };
+  });
 }
 
 function normalizeWishComments(comments = []) {
@@ -768,6 +835,7 @@ function applyRemoteFamilyData(data = {}) {
     trips: normalizeTrips(data.trips),
     wishes: normalizeWishes(data.wishes),
     expenses: normalizeExpenses(data.expenses),
+    creditCards: normalizeCreditCards(data.creditCards),
     currentMemberId: signedInMemberId || localStorage.getItem(LOCAL_PROFILE_KEY) || state.currentMemberId || "me",
   };
 
@@ -820,6 +888,7 @@ function saveCloudState(force = false) {
     trips: state.trips,
     wishes: state.wishes,
     expenses: state.expenses,
+    creditCards: state.creditCards,
     updatedBy: cloudState.user.email || cloudState.user.uid,
     updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
   };
@@ -1519,9 +1588,44 @@ function deleteStopFromDay(dayId, stopId) {
 
 function renderFinance() {
   elements.financeManualDate.value ||= isoToday;
+  renderCreditCards();
   renderFinanceTotal();
   renderFinanceCalendar();
   renderFinanceExpenses();
+}
+
+function renderCreditCards() {
+  if (!state.creditCards) {
+    state.creditCards = normalizeCreditCards();
+  }
+
+  elements.financeCreditCardList.innerHTML = state.creditCards
+    .map(
+      (card) => `
+        <article class="credit-card-row">
+          <div>
+            <p class="eyebrow">${escapeHTML(card.issuer)}</p>
+            <h3>${escapeHTML(card.name)}</h3>
+            <p>${escapeHTML(card.recommendedUsage)}</p>
+          </div>
+          <div class="credit-card-fields">
+            <label>
+              Bill amount
+              <input data-card-field="billAmount" data-card-id="${escapeAttribute(card.id)}" type="number" min="0" step="0.01" value="${card.billAmount || ""}" placeholder="0.00" />
+            </label>
+            <label>
+              Due date
+              <input data-card-field="dueDate" data-card-id="${escapeAttribute(card.id)}" type="date" value="${escapeAttribute(card.dueDate || "")}" />
+            </label>
+          </div>
+        </article>
+      `,
+    )
+    .join("");
+
+  elements.financeCreditCardList.querySelectorAll("[data-card-field]").forEach((input) => {
+    input.addEventListener("change", updateCreditCardField);
+  });
 }
 
 function renderFinanceTotal() {
@@ -1682,6 +1786,23 @@ function updateFinanceExpenseNote(event) {
   if (!expense) return;
   expense.note = event.currentTarget.value.trim();
   expense.updatedAt = new Date().toISOString();
+  saveState();
+}
+
+function updateCreditCardField(event) {
+  const card = state.creditCards.find((item) => item.id === event.currentTarget.dataset.cardId);
+  if (!card) return;
+
+  const field = event.currentTarget.dataset.cardField;
+  if (field === "billAmount") {
+    card.billAmount = normalizeExpenseAmount(event.currentTarget.value);
+  } else if (field === "dueDate") {
+    card.dueDate = event.currentTarget.value;
+  } else {
+    return;
+  }
+
+  card.updatedAt = new Date().toISOString();
   saveState();
 }
 
@@ -3722,6 +3843,7 @@ function importState(event) {
         trips: normalizeTrips(imported.trips),
         wishes: normalizeWishes(imported.wishes),
         expenses: normalizeExpenses(imported.expenses),
+        creditCards: normalizeCreditCards(imported.creditCards),
         currentMemberId: imported.currentMemberId || "me",
       };
       selectedTaskId = state.tasks[0]?.id ?? null;
