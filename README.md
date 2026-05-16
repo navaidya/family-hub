@@ -6,9 +6,11 @@ Open `index.html` in a browser. Tasks are saved to local browser storage, and ba
 
 Each family member has a local profile. Use **Switch** to log in as Naval, Priyanka, Vivan, or Yuvika, and use the current profile button to edit that member's name, age, email, color, optional PIN, reminder window, and digest preference. New tasks and comments default to the signed-in profile.
 
+Default household PINs are set for each member: Naval `1980`, Priyanka `1983`, Vivan `2010`, and Yuvika `2017`. Each member can change their own PIN from profile settings. Naval is the admin profile and can reset any family member's PIN from his profile settings.
+
 Email reminder buttons use `mailto:` links, so they open the default email client with a prefilled progress message. Automatic background email delivery would require a small backend with SMTP or an email provider.
 
-PINs are stored in the browser's local storage for lightweight household use. They are not secure account authentication.
+PINs are stored in the browser's local storage, and in Firestore when sync is enabled, for lightweight household use. They are not secure account authentication.
 
 ## Native iOS app
 

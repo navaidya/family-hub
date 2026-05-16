@@ -1,6 +1,7 @@
 const STORAGE_KEY = "family-hub-state-v1";
 const LEGACY_STORAGE_KEY = "family-planner-state-v1";
 const LOCAL_PROFILE_KEY = "family-hub-local-profile-v1";
+const ADMIN_MEMBER_ID = "me";
 
 const statuses = [
   { id: "all", label: "All" },
@@ -17,7 +18,7 @@ const familyMembers = [
     age: 46,
     email: "me@example.com",
     color: "#0f766e",
-    pin: "",
+    pin: "1980",
     settings: { reminderDays: 7, includeInDigest: true },
   },
   {
@@ -26,7 +27,7 @@ const familyMembers = [
     age: 43,
     email: "wife@example.com",
     color: "#4754a3",
-    pin: "",
+    pin: "1983",
     settings: { reminderDays: 7, includeInDigest: true },
   },
   {
@@ -35,7 +36,7 @@ const familyMembers = [
     age: 16,
     email: "son@example.com",
     color: "#d95f43",
-    pin: "",
+    pin: "2010",
     settings: { reminderDays: 5, includeInDigest: true },
   },
   {
@@ -44,7 +45,7 @@ const familyMembers = [
     age: 9,
     email: "daughter@example.com",
     color: "#237a57",
-    pin: "",
+    pin: "2017",
     settings: { reminderDays: 3, includeInDigest: true },
   },
 ];
@@ -108,6 +109,8 @@ const elements = {
   profilePin: document.querySelector("#profilePin"),
   profileReminderDays: document.querySelector("#profileReminderDays"),
   profileDigest: document.querySelector("#profileDigest"),
+  profileAdminPanel: document.querySelector("#profileAdminPanel"),
+  profileAdminPins: document.querySelector("#profileAdminPins"),
   closeProfileBtn: document.querySelector("#closeProfileBtn"),
   cancelProfileBtn: document.querySelector("#cancelProfileBtn"),
   cloudDialog: document.querySelector("#cloudDialog"),
@@ -171,6 +174,7 @@ function normalizeMembers(savedMembers = []) {
       ...defaultMember,
       ...saved,
       name: shouldUseDefaultName ? defaultMember.name : savedName,
+      pin: normalizePin(saved.pin || defaultMember.pin),
       settings: {
         ...defaultMember.settings,
         ...(saved.settings ?? {}),
@@ -188,6 +192,10 @@ function normalizeTasks(tasks = []) {
         "Son driving practice plan": "Vivan driving practice plan",
       }[task.title] ?? task.title,
   }));
+}
+
+function normalizePin(pin) {
+  return String(pin || "").trim();
 }
 
 function seedTasks() {
@@ -690,6 +698,7 @@ function openProfileDialog() {
   elements.profilePin.value = member.pin ?? "";
   elements.profileReminderDays.value = member.settings?.reminderDays ?? 7;
   elements.profileDigest.checked = member.settings?.includeInDigest ?? true;
+  renderAdminPinControls();
   renderProfilePreview();
   elements.profileDialog.showModal();
   elements.profileName.focus();
@@ -715,11 +724,16 @@ function saveProfileSettings(event) {
   member.age = Number(elements.profileAge.value);
   member.email = elements.profileEmail.value.trim();
   member.color = elements.profileColor.value;
-  member.pin = elements.profilePin.value.trim();
+  member.pin = normalizePin(elements.profilePin.value);
   member.settings = {
     reminderDays: Number(elements.profileReminderDays.value) || 7,
     includeInDigest: elements.profileDigest.checked,
   };
+
+  if (isAdminMember()) {
+    const updated = applyAdminPinResets();
+    if (!updated) return;
+  }
 
   saveState();
   closeProfileDialog();
@@ -727,9 +741,50 @@ function saveProfileSettings(event) {
   render();
 }
 
+function renderAdminPinControls() {
+  const isAdmin = isAdminMember();
+  elements.profileAdminPanel.hidden = !isAdmin;
+  if (!isAdmin) {
+    elements.profileAdminPins.innerHTML = "";
+    return;
+  }
+
+  elements.profileAdminPins.innerHTML = state.members
+    .map(
+      (member) => `
+        <label>
+          ${escapeHTML(member.name)}
+          <input type="password" inputmode="numeric" minlength="4" maxlength="12" placeholder="Leave unchanged" data-admin-pin="${member.id}" />
+        </label>
+      `,
+    )
+    .join("");
+}
+
+function applyAdminPinResets() {
+  const inputs = [...elements.profileAdminPins.querySelectorAll("[data-admin-pin]")];
+  for (const input of inputs) {
+    const pin = normalizePin(input.value);
+    if (!pin) continue;
+    if (pin.length < 4) {
+      window.alert("PIN resets must be at least 4 characters.");
+      input.focus();
+      return false;
+    }
+
+    const member = getMember(input.dataset.adminPin);
+    if (member) {
+      member.pin = pin;
+    }
+  }
+
+  return true;
+}
+
 function closeProfileDialog() {
   elements.profileDialog.close();
   elements.profileForm.reset();
+  elements.profileAdminPins.innerHTML = "";
 }
 
 function renderStatusTabs() {
@@ -1283,6 +1338,10 @@ function initials(name) {
 
 function currentMember() {
   return getMember(state.currentMemberId) ?? state.members[0] ?? familyMembers[0];
+}
+
+function isAdminMember() {
+  return state.currentMemberId === ADMIN_MEMBER_ID;
 }
 
 function getMember(id) {

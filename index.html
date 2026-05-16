@@ -259,7 +259,7 @@
 
             <label>
               PIN
-              <input id="profilePin" type="password" inputmode="numeric" autocomplete="new-password" placeholder="Optional" />
+              <input id="profilePin" type="password" inputmode="numeric" autocomplete="new-password" minlength="4" maxlength="12" required />
             </label>
 
             <label>
@@ -272,6 +272,12 @@
             <input id="profileDigest" type="checkbox" />
             Include me in digest emails
           </label>
+
+          <section class="admin-panel" id="profileAdminPanel" hidden>
+            <h3>Admin PIN resets</h3>
+            <p>Naval can reset any family member's PIN. Leave a field blank to keep the current PIN.</p>
+            <div class="admin-pin-grid" id="profileAdminPins"></div>
+          </section>
         </div>
 
         <div class="dialog-actions">

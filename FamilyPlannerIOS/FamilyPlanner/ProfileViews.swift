@@ -136,6 +136,8 @@ struct ProfileEditorView: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var member: FamilyMember
+    @State private var adminPins: [String: String] = [:]
+    @State private var adminError = ""
 
     init(member: FamilyMember) {
         _member = State(initialValue: member)
@@ -164,10 +166,27 @@ struct ProfileEditorView: View {
                 }
 
                 Section("Security") {
-                    SecureField("Optional PIN", text: $member.pin)
+                    SecureField("PIN", text: $member.pin)
                     Text("This is a lightweight household PIN stored on the device.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                }
+
+                if store.currentMemberId == "naval" {
+                    Section("Admin PIN resets") {
+                        Text("Naval can reset any family member's PIN. Leave a field blank to keep the current PIN.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+
+                        ForEach(store.members) { familyMember in
+                            SecureField(familyMember.name, text: adminPinBinding(for: familyMember.id))
+                        }
+
+                        if !adminError.isEmpty {
+                            Text(adminError)
+                                .foregroundStyle(.red)
+                        }
+                    }
                 }
 
                 Section("Reminders") {
@@ -182,11 +201,37 @@ struct ProfileEditorView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
-                        store.saveProfile(member)
-                        dismiss()
+                        save()
                     }
                 }
             }
+        }
+    }
+
+    private func save() {
+        let hasInvalidAdminPin = adminPins.values.contains { pin in
+            let trimmed = pin.trimmingCharacters(in: .whitespacesAndNewlines)
+            return !trimmed.isEmpty && trimmed.count < 4
+        }
+
+        guard !hasInvalidAdminPin else {
+            adminError = "PIN resets must be at least 4 characters."
+            return
+        }
+
+        store.saveProfile(member)
+        if store.currentMemberId == "naval" {
+            store.resetPins(adminPins)
+        }
+        dismiss()
+    }
+
+    private func adminPinBinding(for memberId: String) -> Binding<String> {
+        Binding {
+            adminPins[memberId, default: ""]
+        } set: { value in
+            adminPins[memberId] = value
+            adminError = ""
         }
     }
 

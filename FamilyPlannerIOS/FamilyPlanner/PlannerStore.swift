@@ -23,7 +23,7 @@ final class PlannerStore: ObservableObject {
             let data = storedData,
             let snapshot = try? JSONDecoder.planner.decode(PlannerSnapshot.self, from: data)
         {
-            members = snapshot.members
+            members = Self.normalizedMembers(snapshot.members)
             tasks = snapshot.tasks
             currentMemberId = snapshot.currentMemberId
         } else {
@@ -71,6 +71,19 @@ final class PlannerStore: ObservableObject {
         members[index] = member
     }
 
+    func resetPins(_ pinsByMemberId: [String: String]) {
+        for (memberId, pin) in pinsByMemberId {
+            guard
+                !pin.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                let index = members.firstIndex(where: { $0.id == memberId })
+            else {
+                continue
+            }
+
+            members[index].pin = pin.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+    }
+
     func addTask(_ task: PlannerTask) {
         tasks.insert(task, at: 0)
         NotificationManager.shared.scheduleReminder(for: task, assigneeName: memberName(task.assigneeId ?? task.requesterId))
@@ -115,6 +128,18 @@ final class PlannerStore: ObservableObject {
         guard let data = try? JSONEncoder.planner.encode(snapshot) else { return }
         UserDefaults.standard.set(data, forKey: storageKey)
         UserDefaults.standard.removeObject(forKey: legacyStorageKey)
+    }
+}
+
+private extension PlannerStore {
+    static func normalizedMembers(_ savedMembers: [FamilyMember]) -> [FamilyMember] {
+        FamilyMember.defaults.map { defaultMember in
+            var member = savedMembers.first(where: { $0.id == defaultMember.id }) ?? defaultMember
+            if member.pin.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                member.pin = defaultMember.pin
+            }
+            return member
+        }
     }
 }
 

@@ -111,7 +111,7 @@ extension FamilyMember {
             age: 46,
             email: "",
             colorHex: "#0F766E",
-            pin: "",
+            pin: "1980",
             settings: MemberSettings(reminderDays: 7, includeInDigest: true)
         ),
         FamilyMember(
@@ -120,7 +120,7 @@ extension FamilyMember {
             age: 43,
             email: "",
             colorHex: "#4754A3",
-            pin: "",
+            pin: "1983",
             settings: MemberSettings(reminderDays: 7, includeInDigest: true)
         ),
         FamilyMember(
@@ -129,7 +129,7 @@ extension FamilyMember {
             age: 16,
             email: "",
             colorHex: "#D95F43",
-            pin: "",
+            pin: "2010",
             settings: MemberSettings(reminderDays: 5, includeInDigest: true)
         ),
         FamilyMember(
@@ -138,7 +138,7 @@ extension FamilyMember {
             age: 9,
             email: "",
             colorHex: "#237A57",
-            pin: "",
+            pin: "2017",
             settings: MemberSettings(reminderDays: 3, includeInDigest: true)
         )
     ]
