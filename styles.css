@@ -577,8 +577,13 @@ label.import-button {
   gap: 14px;
   padding: 12px;
   border: 1px solid var(--line);
+  border-left: 5px solid var(--amber);
   border-radius: 8px;
   background: #f8fafc;
+}
+
+.credit-card-row.paid {
+  border-left-color: var(--green);
 }
 
 .credit-card-row h3,
@@ -594,6 +599,17 @@ label.import-button {
   color: var(--muted);
   font-size: 0.92rem;
   line-height: 1.45;
+}
+
+.credit-card-status-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin: 8px 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+  font-weight: 800;
 }
 
 .credit-card-fields {
@@ -620,6 +636,20 @@ label.import-button {
   color: var(--ink);
   font: inherit;
   text-transform: none;
+}
+
+.credit-card-actions {
+  display: grid;
+  gap: 8px;
+}
+
+.credit-card-actions .secondary-button {
+  width: 100%;
+}
+
+.payment-due {
+  color: #8a2d22;
+  background: #ffe3de;
 }
 
 .finance-expense-card {
@@ -1022,6 +1052,11 @@ label.import-button {
 .badge.high {
   color: #8a2d22;
   background: #ffe3de;
+}
+
+.badge.paid {
+  color: #135e46;
+  background: #dff4ea;
 }
 
 .badge.repeat {
@@ -1432,6 +1467,16 @@ label.import-button {
 .calendar-task.wish {
   color: #38417e;
   background: #e5e8ff;
+}
+
+.calendar-task.card-reminder {
+  color: #7a2f1f;
+  background: #fff1cf;
+}
+
+.calendar-task.card-due {
+  color: #8a2d22;
+  background: #ffe3de;
 }
 
 .calendar-task.done {

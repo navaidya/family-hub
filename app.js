@@ -517,10 +517,12 @@ function normalizeExpenses(expenses = []) {
 function normalizeCreditCards(savedCards = []) {
   return defaultCreditCards.map((defaultCard) => {
     const saved = Array.isArray(savedCards) ? savedCards.find((card) => card.id === defaultCard.id) : null;
+    const migratedDueDay = saved?.dueDay || (saved?.dueDate ? parseLocalDate(saved.dueDate).getDate() : "");
     return {
       ...defaultCard,
       billAmount: normalizeExpenseAmount(saved?.billAmount),
-      dueDate: saved?.dueDate || "",
+      dueDay: normalizeDueDay(migratedDueDay),
+      paidMonth: saved?.paidMonth || "",
       updatedAt: saved?.updatedAt || "",
     };
   });
@@ -551,6 +553,12 @@ function normalizeExpenseAmount(amount) {
   const numeric = typeof amount === "number" ? amount : Number(String(amount || "").replace(/[$,\s]/g, ""));
   if (!Number.isFinite(numeric)) return 0;
   return Math.round(Math.abs(numeric) * 100) / 100;
+}
+
+function normalizeDueDay(day) {
+  const numeric = Number(day);
+  if (!Number.isFinite(numeric) || numeric < 1) return "";
+  return Math.min(31, Math.floor(numeric));
 }
 
 function seedTasks() {
@@ -1599,33 +1607,61 @@ function renderCreditCards() {
     state.creditCards = normalizeCreditCards();
   }
 
+  const canEdit = isAdminMember();
   elements.financeCreditCardList.innerHTML = state.creditCards
     .map(
-      (card) => `
-        <article class="credit-card-row">
-          <div>
-            <p class="eyebrow">${escapeHTML(card.issuer)}</p>
-            <h3>${escapeHTML(card.name)}</h3>
-            <p>${escapeHTML(card.recommendedUsage)}</p>
-          </div>
-          <div class="credit-card-fields">
-            <label>
-              Bill amount
-              <input data-card-field="billAmount" data-card-id="${escapeAttribute(card.id)}" type="number" min="0" step="0.01" value="${card.billAmount || ""}" placeholder="0.00" />
-            </label>
-            <label>
-              Due date
-              <input data-card-field="dueDate" data-card-id="${escapeAttribute(card.id)}" type="date" value="${escapeAttribute(card.dueDate || "")}" />
-            </label>
-          </div>
-        </article>
-      `,
+      (card) => {
+        const paid = isCreditCardPaidForFinanceMonth(card);
+        const dueDate = creditCardDueDateForMonth(card, visibleFinanceMonth);
+        const reminderDate = dueDate ? addDays(dueDate, -7) : "";
+        return `
+          <article class="credit-card-row ${paid ? "paid" : "due"}" data-credit-card-row="${escapeAttribute(card.id)}">
+            <div>
+              <p class="eyebrow">${escapeHTML(card.issuer)}</p>
+              <h3>${escapeHTML(card.name)}</h3>
+              <div class="credit-card-status-line">
+                <span class="badge ${paid ? "paid" : "high"}">${paid ? "Paid" : "Due"}</span>
+                <span>${dueDate ? `Due ${formatShortDate(dueDate)}` : "Add due day"}</span>
+                <span>${reminderDate ? `Reminder ${formatShortDate(reminderDate)}` : "Reminder appears 7 days before due date"}</span>
+              </div>
+              <p>${escapeHTML(card.recommendedUsage)}</p>
+            </div>
+            <div class="credit-card-fields">
+              <label>
+                Bill amount
+                <input data-card-field="billAmount" data-card-id="${escapeAttribute(card.id)}" type="number" min="0" step="0.01" value="${card.billAmount || ""}" placeholder="0.00" ${canEdit ? "" : "disabled"} />
+              </label>
+              <label>
+                Due day every month
+                <input data-card-field="dueDay" data-card-id="${escapeAttribute(card.id)}" type="number" min="1" max="31" step="1" value="${card.dueDay || ""}" placeholder="Day" ${canEdit ? "" : "disabled"} />
+              </label>
+              <div class="credit-card-actions">
+                <button class="secondary-button ${paid ? "" : "payment-due"}" type="button" data-card-paid="${escapeAttribute(card.id)}" ${canEdit ? "" : "disabled"}>
+                  <i data-lucide="${paid ? "check-circle-2" : "circle-dollar-sign"}"></i>
+                  ${paid ? "Mark due" : "Mark paid"}
+                </button>
+                <button class="secondary-button" type="button" data-card-sms="${escapeAttribute(card.id)}">
+                  <i data-lucide="message-square"></i>
+                  Text
+                </button>
+              </div>
+            </div>
+          </article>
+        `;
+      },
     )
     .join("");
 
   elements.financeCreditCardList.querySelectorAll("[data-card-field]").forEach((input) => {
     input.addEventListener("change", updateCreditCardField);
   });
+  elements.financeCreditCardList.querySelectorAll("[data-card-paid]").forEach((button) => {
+    button.addEventListener("click", () => toggleCreditCardPaid(button.dataset.cardPaid));
+  });
+  elements.financeCreditCardList.querySelectorAll("[data-card-sms]").forEach((button) => {
+    button.addEventListener("click", () => sendCreditCardReminder(button.dataset.cardSms));
+  });
+  refreshIcons();
 }
 
 function renderFinanceTotal() {
@@ -1657,6 +1693,7 @@ function renderFinanceCalendar() {
       .map((date) => {
         const iso = toISODate(date);
         const expenses = state.expenses.filter((expense) => expense.date === iso);
+        const cardEvents = getCreditCardEventsForDate(iso);
         const outside = date.getMonth() !== visibleFinanceMonth.getMonth();
         const isToday = iso === isoToday;
         return `
@@ -1672,6 +1709,15 @@ function renderFinanceCalendar() {
                   `,
                 )
                 .join("")}
+              ${cardEvents
+                .map(
+                  (event) => `
+                    <button class="calendar-task ${event.kind === "reminder" ? "card-reminder" : "card-due"}" type="button" data-finance-card="${escapeAttribute(event.cardId)}" title="${escapeAttribute(event.title)}">
+                      ${escapeHTML(event.title)}
+                    </button>
+                  `,
+                )
+                .join("")}
             </div>
           </div>
         `;
@@ -1682,6 +1728,12 @@ function renderFinanceCalendar() {
   elements.financeCalendarGrid.querySelectorAll("[data-finance-expense]").forEach((button) => {
     button.addEventListener("click", () => {
       const row = elements.financeExpenseList.querySelector(`[data-expense-card="${CSS.escape(button.dataset.financeExpense)}"]`);
+      row?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+  });
+  elements.financeCalendarGrid.querySelectorAll("[data-finance-card]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const row = elements.financeCreditCardList.querySelector(`[data-credit-card-row="${CSS.escape(button.dataset.financeCard)}"]`);
       row?.scrollIntoView({ behavior: "smooth", block: "center" });
     });
   });
@@ -1792,18 +1844,58 @@ function updateFinanceExpenseNote(event) {
 function updateCreditCardField(event) {
   const card = state.creditCards.find((item) => item.id === event.currentTarget.dataset.cardId);
   if (!card) return;
+  if (!isAdminMember()) {
+    event.currentTarget.value = event.currentTarget.defaultValue;
+    window.alert("Only Naval can edit credit card settings and payments.");
+    return;
+  }
 
   const field = event.currentTarget.dataset.cardField;
   if (field === "billAmount") {
     card.billAmount = normalizeExpenseAmount(event.currentTarget.value);
-  } else if (field === "dueDate") {
-    card.dueDate = event.currentTarget.value;
+  } else if (field === "dueDay") {
+    card.dueDay = normalizeDueDay(event.currentTarget.value);
   } else {
     return;
   }
 
   card.updatedAt = new Date().toISOString();
   saveState();
+  renderFinance();
+}
+
+function toggleCreditCardPaid(cardId) {
+  if (!isAdminMember()) {
+    window.alert("Only Naval can change credit card payment status.");
+    return;
+  }
+
+  const card = state.creditCards.find((item) => item.id === cardId);
+  if (!card) return;
+  const monthKey = financeMonthKey(visibleFinanceMonth);
+  card.paidMonth = card.paidMonth === monthKey ? "" : monthKey;
+  card.updatedAt = new Date().toISOString();
+  saveState();
+  renderFinance();
+}
+
+function sendCreditCardReminder(cardId) {
+  const card = state.creditCards.find((item) => item.id === cardId);
+  const naval = getMember(ADMIN_MEMBER_ID);
+  if (!card || !naval?.phone) {
+    window.alert("Add Naval's phone number in profile settings first.");
+    return;
+  }
+
+  const dueDate = creditCardDueDateForMonth(card, visibleFinanceMonth);
+  const status = isCreditCardPaidForFinanceMonth(card) ? "Paid" : "Due";
+  const body = [
+    `Family Hub credit card reminder: ${card.name}`,
+    `Status: ${status}`,
+    `Due: ${dueDate ? formatLongDate(dueDate) : "Due day not set"}`,
+    `Amount: ${formatMoney(card.billAmount)}`,
+  ].join("\n");
+  openSms(naval.phone, body);
 }
 
 function handleFinanceDragOver(event) {
@@ -3905,6 +3997,35 @@ function getWishEventsForDate(dateString) {
     }));
 }
 
+function getCreditCardEventsForDate(dateString) {
+  if (!state.creditCards) return [];
+
+  return state.creditCards.flatMap((card) => {
+    const dueDate = creditCardDueDateForMonth(card, visibleFinanceMonth);
+    if (!dueDate) return [];
+
+    const events = [];
+    const reminderDate = addDays(dueDate, -7);
+    const amount = card.billAmount ? ` ${formatMoney(card.billAmount)}` : "";
+    const status = isCreditCardPaidForFinanceMonth(card) ? "paid" : "due";
+    if (dateString === reminderDate) {
+      events.push({
+        cardId: card.id,
+        kind: "reminder",
+        title: `Reminder: ${card.name}${amount}`,
+      });
+    }
+    if (dateString === dueDate) {
+      events.push({
+        cardId: card.id,
+        kind: "due",
+        title: `Due: ${card.name} (${status})${amount}`,
+      });
+    }
+    return events;
+  });
+}
+
 function getNotebookNotes(memberId = state.currentMemberId) {
   if (!state.notes) {
     state.notes = normalizeNotes();
@@ -3955,6 +4076,21 @@ function getExpensesForFinanceMonth() {
 
 function sumExpenses(expenses) {
   return expenses.reduce((total, expense) => total + expense.amount, 0);
+}
+
+function creditCardDueDateForMonth(card, monthDate = visibleFinanceMonth) {
+  if (!card.dueDay) return "";
+  const lastDay = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0).getDate();
+  return toISODate(new Date(monthDate.getFullYear(), monthDate.getMonth(), Math.min(card.dueDay, lastDay)));
+}
+
+function financeMonthKey(monthDate = visibleFinanceMonth) {
+  const month = String(monthDate.getMonth() + 1).padStart(2, "0");
+  return `${monthDate.getFullYear()}-${month}`;
+}
+
+function isCreditCardPaidForFinanceMonth(card) {
+  return card.paidMonth === financeMonthKey(visibleFinanceMonth);
 }
 
 function getDueState(task) {
