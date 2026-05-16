@@ -654,6 +654,12 @@ label.import-button {
   font-size: 1.24rem;
 }
 
+.task-heading-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .search-control {
   display: flex;
   align-items: center;
@@ -1556,6 +1562,11 @@ label.import-button {
   .panel-heading {
     gap: 10px;
     margin-bottom: 12px;
+  }
+
+  .task-heading-actions {
+    display: grid;
+    width: 100%;
   }
 
   .panel-heading .primary-button {

@@ -53,10 +53,6 @@
           <i data-lucide="upload">↑</i>
           <input id="importInput" type="file" accept="application/json" />
         </label>
-        <button class="primary-button" id="newTaskBtn" type="button">
-          <i data-lucide="plus"></i>
-          New task
-        </button>
       </div>
     </header>
 
@@ -107,9 +103,15 @@
               <p class="eyebrow">Main page</p>
               <h2>Tasks</h2>
             </div>
-            <div class="search-control">
-              <i data-lucide="search"></i>
-              <input id="searchInput" type="search" placeholder="Search" autocomplete="off" />
+            <div class="task-heading-actions">
+              <div class="search-control">
+                <i data-lucide="search"></i>
+                <input id="searchInput" type="search" placeholder="Search" autocomplete="off" />
+              </div>
+              <button class="primary-button" id="newTaskBtn" type="button">
+                <i data-lucide="plus"></i>
+                New task
+              </button>
             </div>
           </div>
 
