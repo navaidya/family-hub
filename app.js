@@ -540,6 +540,7 @@ function renderCloudDialog() {
       <strong>Local mode</strong>
       <span>Add Firebase config, then enable Google sign-in and Firestore in Firebase.</span>
     `;
+    elements.cloudGoogleBtn.hidden = false;
     elements.cloudGoogleBtn.disabled = true;
     elements.cloudSignOutBtn.disabled = true;
     return;
@@ -550,6 +551,7 @@ function renderCloudDialog() {
       <strong>Synced as ${escapeHTML(cloudState.user.email || "Firebase user")}</strong>
       <span>Family data: ${escapeHTML(familyId)}</span>
     `;
+    elements.cloudGoogleBtn.hidden = true;
     elements.cloudGoogleBtn.disabled = true;
     elements.cloudSignOutBtn.disabled = false;
     return;
@@ -559,6 +561,7 @@ function renderCloudDialog() {
     <strong>Cloud sync ready</strong>
     <span>Sign in with a family Google account to share tasks through Firestore.</span>
   `;
+  elements.cloudGoogleBtn.hidden = false;
   elements.cloudGoogleBtn.disabled = false;
   elements.cloudSignOutBtn.disabled = true;
 }
