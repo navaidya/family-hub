@@ -439,7 +439,7 @@ label.import-button {
 
 .travel-grid {
   display: grid;
-  grid-template-columns: minmax(220px, 0.34fr) minmax(0, 1fr);
+  grid-template-columns: 1fr;
   gap: 14px;
 }
 
@@ -793,7 +793,6 @@ label.import-button {
   font-size: 0.9rem;
 }
 
-.trip-list,
 .trip-detail-stack,
 .hotel-list,
 .trip-day-list,
@@ -802,20 +801,49 @@ label.import-button {
   gap: 10px;
 }
 
+.trip-list {
+  display: flex;
+  gap: 8px;
+  max-width: 100%;
+  overflow-x: auto;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f8fafc;
+  scrollbar-width: thin;
+}
+
 .trip-row {
-  display: grid;
-  gap: 5px;
-  padding: 12px;
+  display: flex;
+  flex: 0 0 min(250px, 72vw);
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  min-height: 72px;
+  padding: 10px 12px;
   border: 1px solid var(--line);
   border-radius: 8px;
   color: var(--ink);
   background: var(--surface);
   text-align: left;
+  scroll-snap-align: start;
 }
 
 .trip-row.selected {
   border-color: var(--teal);
-  background: var(--surface-soft);
+  background: #ecfdf5;
+  box-shadow: inset 0 0 0 1px rgba(15, 118, 110, 0.2);
+}
+
+.trip-row:focus-visible {
+  outline: 3px solid rgba(15, 118, 110, 0.24);
+  outline-offset: 2px;
+}
+
+.trip-row strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .trip-row span,

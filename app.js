@@ -1305,15 +1305,22 @@ function renderTrips() {
   }
 
   elements.tripList.innerHTML = state.trips
-    .map(
-      (trip) => `
-        <button class="trip-row ${trip.id === selectedTripId ? "selected" : ""}" type="button" data-trip-id="${escapeAttribute(trip.id)}">
+    .map((trip, index) => {
+      const selected = trip.id === selectedTripId;
+      return `
+        <button
+          class="trip-row ${selected ? "selected" : ""}"
+          type="button"
+          role="tab"
+          aria-selected="${selected ? "true" : "false"}"
+          tabindex="${selected || index === 0 ? "0" : "-1"}"
+          data-trip-id="${escapeAttribute(trip.id)}"
+        >
           <strong>${escapeHTML(trip.title)}</strong>
-          <span>${escapeHTML(trip.destination)} · ${formatTripRange(trip)}</span>
-          <span>${trip.days.length} day${trip.days.length === 1 ? "" : "s"} · ${trip.hotels.length} hotel${trip.hotels.length === 1 ? "" : "s"}</span>
+          <span>${escapeHTML(trip.destination || "Destination")} · ${formatTripRange(trip)}</span>
         </button>
-      `,
-    )
+      `;
+    })
     .join("");
 
   elements.tripList.querySelectorAll("[data-trip-id]").forEach((button) => {
