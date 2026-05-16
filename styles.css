@@ -139,6 +139,28 @@ label.import-button {
   background: #fff2cc;
 }
 
+.google-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 46px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  background: white;
+  font-weight: 900;
+}
+
+.google-button:hover {
+  background: #f8fafc;
+}
+
+.google-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
 .profile-button:hover {
   background: #f8fafc;
 }
@@ -181,7 +203,8 @@ label.import-button {
 .secondary-button svg,
 .chip-button svg,
 .profile-button svg,
-.cloud-button svg {
+.cloud-button svg,
+.google-button svg {
   width: 18px;
   height: 18px;
   flex: 0 0 auto;
@@ -635,6 +658,24 @@ label.import-button {
 
 .cloud-summary strong {
   color: var(--ink);
+}
+
+.form-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.form-divider::before,
+.form-divider::after {
+  content: "";
+  height: 1px;
+  flex: 1;
+  background: var(--line);
 }
 
 .profile-editor {

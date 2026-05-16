@@ -123,6 +123,7 @@ const elements = {
   cloudEmail: document.querySelector("#cloudEmail"),
   cloudPassword: document.querySelector("#cloudPassword"),
   cloudError: document.querySelector("#cloudError"),
+  cloudGoogleBtn: document.querySelector("#cloudGoogleBtn"),
   closeCloudBtn: document.querySelector("#closeCloudBtn"),
   cloudSignOutBtn: document.querySelector("#cloudSignOutBtn"),
   cloudSignUpBtn: document.querySelector("#cloudSignUpBtn"),
@@ -329,6 +330,7 @@ function bindEvents() {
 
   elements.cloudForm.addEventListener("submit", signInToCloud);
   elements.closeCloudBtn.addEventListener("click", closeCloudDialog);
+  elements.cloudGoogleBtn.addEventListener("click", signInWithGoogle);
   elements.cloudSignUpBtn.addEventListener("click", createCloudLogin);
   elements.cloudSignOutBtn.addEventListener("click", signOutOfCloud);
   elements.cloudDialog.addEventListener("click", (event) => {
@@ -536,8 +538,9 @@ function renderCloudDialog() {
   if (!cloudState.configured) {
     elements.cloudSummary.innerHTML = `
       <strong>Local mode</strong>
-      <span>Add your Firebase project values in <code>firebase-config.js</code>, then enable Email/Password sign-in in Firebase.</span>
+      <span>Add Firebase config, then enable Google sign-in and Firestore in Firebase.</span>
     `;
+    elements.cloudGoogleBtn.disabled = true;
     elements.cloudSignOutBtn.disabled = true;
     return;
   }
@@ -547,14 +550,16 @@ function renderCloudDialog() {
       <strong>Synced as ${escapeHTML(cloudState.user.email || "Firebase user")}</strong>
       <span>Family data: ${escapeHTML(familyId)}</span>
     `;
+    elements.cloudGoogleBtn.disabled = true;
     elements.cloudSignOutBtn.disabled = false;
     return;
   }
 
   elements.cloudSummary.innerHTML = `
     <strong>Cloud sync ready</strong>
-    <span>Sign in or create a login to share tasks through Firestore.</span>
+    <span>Sign in with a family Google account to share tasks through Firestore.</span>
   `;
+  elements.cloudGoogleBtn.disabled = false;
   elements.cloudSignOutBtn.disabled = true;
 }
 
@@ -575,6 +580,28 @@ function signInToCloud(event) {
     .signInWithEmailAndPassword(elements.cloudEmail.value.trim(), elements.cloudPassword.value)
     .then(() => closeCloudDialog())
     .catch((error) => {
+      elements.cloudError.textContent = firebaseErrorMessage(error);
+    });
+}
+
+function signInWithGoogle() {
+  if (!cloudState.configured) {
+    elements.cloudError.textContent = "Add Firebase config first.";
+    return;
+  }
+
+  elements.cloudError.textContent = "";
+  const provider = new firebase.auth.GoogleAuthProvider();
+  provider.setCustomParameters({ prompt: "select_account" });
+
+  cloudState.auth
+    .signInWithPopup(provider)
+    .then(() => closeCloudDialog())
+    .catch((error) => {
+      if (error?.code === "auth/popup-blocked") {
+        cloudState.auth.signInWithRedirect(provider);
+        return;
+      }
       elements.cloudError.textContent = firebaseErrorMessage(error);
     });
 }
@@ -606,6 +633,8 @@ function firebaseErrorMessage(error) {
   if (code.includes("invalid-email")) return "Enter a valid email address.";
   if (code.includes("weak-password")) return "Use a password with at least 6 characters.";
   if (code.includes("email-already-in-use")) return "That email already has a login.";
+  if (code.includes("unauthorized-domain")) return "Add this website domain in Firebase Authentication settings.";
+  if (code.includes("popup-blocked")) return "Allow popups or try again in Safari/Chrome.";
   if (code.includes("user-not-found") || code.includes("wrong-password") || code.includes("invalid-credential")) {
     return "Email or password did not match.";
   }

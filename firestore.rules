@@ -5,10 +5,10 @@ service cloud.firestore {
     function isFamilyMember() {
       return request.auth != null
         && request.auth.token.email in [
-          "naval@example.com",
-          "priyanka@example.com",
-          "vivan@example.com",
-          "yuvika@example.com"
+          "navalvaidya@gmail.com",
+          "priyanka.naval.vaidya@gmail.com",
+          "vivaanvaidya@gmail.com",
+          "yuvikavaidya@gmail.com"
         ];
     }
 
