@@ -19,7 +19,22 @@
     <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js" defer></script>
     <script src="app.js" defer></script>
   </head>
-  <body>
+  <body class="auth-loading">
+    <section class="auth-gate" id="authGate" aria-label="Family Hub sign in">
+      <div class="auth-card">
+        <div>
+          <p class="eyebrow">Shared family data</p>
+          <h1>Family Hub</h1>
+          <p>Sign in with your family Google account to open tasks, calendar, notebooks, and reminders.</p>
+        </div>
+        <button class="google-button auth-google-button" id="authGoogleBtn" type="button">
+          <i data-lucide="chrome"></i>
+          Sign in with Google
+        </button>
+        <p class="form-error" id="authStatus"></p>
+      </div>
+    </section>
+
     <header class="app-header">
       <div>
         <p class="eyebrow">Family command center</p>

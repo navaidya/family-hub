@@ -214,6 +214,61 @@ label.import-button {
   display: none;
 }
 
+.auth-gate {
+  display: none;
+  min-height: 100vh;
+  padding: clamp(20px, 5vw, 56px);
+  place-items: center;
+}
+
+.auth-loading .auth-gate,
+.auth-required .auth-gate {
+  display: grid;
+}
+
+.auth-loading .app-header,
+.auth-loading .app-shell,
+.auth-required .app-header,
+.auth-required .app-shell {
+  display: none;
+}
+
+.auth-card {
+  display: grid;
+  gap: 18px;
+  width: min(560px, 100%);
+  padding: clamp(22px, 5vw, 42px);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: var(--shadow);
+}
+
+.auth-card h1,
+.auth-card p {
+  margin: 0;
+}
+
+.auth-card h1 {
+  font-size: clamp(2.2rem, 8vw, 4.8rem);
+  line-height: 0.95;
+  letter-spacing: 0;
+}
+
+.auth-card p {
+  color: var(--muted);
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+.auth-card .form-error {
+  color: var(--red);
+}
+
+.auth-google-button {
+  min-height: 52px;
+}
+
 .app-shell {
   display: grid;
   gap: 18px;

@@ -66,9 +66,11 @@ let selectedTaskId = state.tasks[0]?.id ?? null;
 let visibleMonth = new Date(today.getFullYear(), today.getMonth(), 1);
 let pendingLoginMemberId = state.currentMemberId;
 let cloudState = createCloudState();
-let hasPromptedForCloudLogin = false;
 
 const elements = {
+  authGate: document.querySelector("#authGate"),
+  authGoogleBtn: document.querySelector("#authGoogleBtn"),
+  authStatus: document.querySelector("#authStatus"),
   cloudStatusBtn: document.querySelector("#cloudStatusBtn"),
   currentProfileBtn: document.querySelector("#currentProfileBtn"),
   loginBtn: document.querySelector("#loginBtn"),
@@ -327,6 +329,7 @@ function bindEvents() {
   elements.profileColor.addEventListener("input", renderProfilePreview);
 
   elements.cloudForm.addEventListener("submit", (event) => event.preventDefault());
+  elements.authGoogleBtn.addEventListener("click", signInWithGoogle);
   elements.closeCloudBtn.addEventListener("click", closeCloudDialog);
   elements.cloudGoogleBtn.addEventListener("click", signInWithGoogle);
   elements.cloudSignOutBtn.addEventListener("click", signOutOfCloud);
@@ -379,9 +382,12 @@ function createCloudState() {
 function initCloudSync() {
   cloudState.configured = isFirebaseConfigured();
   if (!cloudState.configured) {
+    renderAuthGate("local");
     renderCloudStatus();
     return;
   }
+
+  renderAuthGate("loading");
 
   try {
     const config = window.FAMILY_HUB_FIREBASE_CONFIG;
@@ -405,12 +411,13 @@ function initCloudSync() {
         subscribeToFamilyDoc();
       }
 
+      renderAuthGate(user ? "ready" : "required");
       renderCloudStatus();
       renderCloudDialog();
-      promptForCloudLoginIfNeeded();
     });
   } catch (error) {
     cloudState.error = error.message || "Firebase could not start.";
+    renderAuthGate("local");
     renderCloudStatus();
   }
 }
@@ -515,20 +522,24 @@ function renderCloudStatus() {
   refreshIcons();
 }
 
+function renderAuthGate(mode) {
+  const isRequired = mode === "required" || mode === "loading";
+  document.body.classList.toggle("auth-loading", mode === "loading");
+  document.body.classList.toggle("auth-required", mode === "required");
+  document.body.classList.toggle("auth-ready", mode === "ready" || mode === "local");
+
+  if (!elements.authGate) return;
+  elements.authGate.hidden = !isRequired;
+  elements.authGoogleBtn.disabled = mode === "loading";
+  elements.authStatus.textContent = mode === "loading" ? "Checking sign-in..." : "";
+}
+
 function openCloudDialog() {
   elements.cloudError.textContent = "";
   renderCloudDialog();
   elements.cloudDialog.showModal();
   if (!cloudState.user) elements.cloudGoogleBtn.focus();
   refreshIcons();
-}
-
-function promptForCloudLoginIfNeeded() {
-  if (hasPromptedForCloudLogin || !cloudState.configured || cloudState.user) return;
-  if (!elements.cloudDialog || elements.cloudDialog.open) return;
-
-  hasPromptedForCloudLogin = true;
-  window.setTimeout(() => openCloudDialog(), 350);
 }
 
 function renderCloudDialog() {
@@ -579,6 +590,7 @@ function signInWithGoogle() {
   }
 
   elements.cloudError.textContent = "";
+  elements.authStatus.textContent = "";
   const provider = new firebase.auth.GoogleAuthProvider();
   provider.setCustomParameters({ prompt: "select_account" });
 
@@ -590,7 +602,9 @@ function signInWithGoogle() {
         cloudState.auth.signInWithRedirect(provider);
         return;
       }
-      elements.cloudError.textContent = firebaseErrorMessage(error);
+      const message = firebaseErrorMessage(error);
+      elements.cloudError.textContent = message;
+      elements.authStatus.textContent = message;
     });
 }
 
