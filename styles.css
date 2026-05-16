@@ -909,6 +909,15 @@ label.import-button {
   padding: 12px;
 }
 
+.stop-card[draggable="true"] {
+  cursor: grab;
+}
+
+.stop-card.dragging {
+  cursor: grabbing;
+  opacity: 0.55;
+}
+
 .hotel-card strong,
 .stop-card strong {
   display: block;
@@ -916,10 +925,34 @@ label.import-button {
   overflow-wrap: anywhere;
 }
 
+.move-stop-select {
+  min-height: 42px;
+  max-width: 170px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  background: #e9eef4;
+  font-weight: 800;
+}
+
 .trip-day-card {
   display: grid;
   gap: 12px;
   padding: 12px;
+}
+
+.trip-day-card.drag-over,
+.stop-list.drag-over {
+  border-color: var(--teal);
+  background: #ecfdf5;
+}
+
+.stop-list {
+  min-height: 44px;
+  border: 1px dashed transparent;
+  border-radius: 8px;
+  padding: 2px;
 }
 
 .trip-day-heading {
@@ -2019,9 +2052,14 @@ label.import-button {
 
   .detail-actions .secondary-button,
   .detail-actions .chip-button,
+  .detail-actions .move-stop-select,
   .dialog-actions .primary-button,
   .dialog-actions .secondary-button {
     flex: 1 1 auto;
+  }
+
+  .move-stop-select {
+    max-width: none;
   }
 
   #deleteTaskBtn,

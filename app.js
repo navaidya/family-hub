@@ -168,6 +168,7 @@ const elements = {
   memberStrip: document.querySelector("#memberStrip"),
   mainTabs: document.querySelector("#mainTabs"),
   taskView: document.querySelector("#taskView"),
+  taskSupportView: document.querySelector("#taskSupportView"),
   wishlistView: document.querySelector("#wishlistView"),
   vacationView: document.querySelector("#vacationView"),
   financeView: document.querySelector("#financeView"),
@@ -1131,6 +1132,7 @@ function renderMainTabs() {
     .join("");
 
   elements.taskView.hidden = activeMainView !== "tasks";
+  elements.taskSupportView.hidden = activeMainView !== "tasks";
   elements.wishlistView.hidden = activeMainView !== "wishlist";
   elements.vacationView.hidden = activeMainView !== "vacation";
   elements.financeView.hidden = activeMainView !== "finance";
@@ -1402,6 +1404,18 @@ function renderTripDetail() {
   elements.tripDetail.querySelectorAll("[data-stop-form]").forEach((formElement) => {
     formElement.addEventListener("submit", addStopToDay);
   });
+  elements.tripDetail.querySelectorAll("[data-stop-move]").forEach((select) => {
+    select.addEventListener("change", () => moveStopToDay(select.dataset.dayId, select.dataset.stopMove, select.value));
+  });
+  elements.tripDetail.querySelectorAll("[data-stop-drag]").forEach((card) => {
+    card.addEventListener("dragstart", handleTripStopDragStart);
+    card.addEventListener("dragend", handleTripStopDragEnd);
+  });
+  elements.tripDetail.querySelectorAll("[data-day-drop]").forEach((dropTarget) => {
+    dropTarget.addEventListener("dragover", handleTripStopDragOver);
+    dropTarget.addEventListener("dragleave", handleTripStopDragLeave);
+    dropTarget.addEventListener("drop", handleTripStopDrop);
+  });
   refreshIcons();
 }
 
@@ -1475,10 +1489,10 @@ function renderGoogleMapsImportForm(trip) {
 
 function renderTripDayCard(trip, day) {
   const stops = day.stops.length
-    ? day.stops.map((stop) => renderTripStop(day, stop)).join("")
+    ? day.stops.map((stop) => renderTripStop(trip, day, stop)).join("")
     : `<div class="empty-state compact">No stops yet.</div>`;
   return `
-    <article class="trip-day-card">
+    <article class="trip-day-card" data-day-drop="${escapeAttribute(day.id)}">
       <div class="trip-day-heading">
         <div>
           <p class="eyebrow">${formatLongDate(day.date)}</p>
@@ -1491,18 +1505,24 @@ function renderTripDayCard(trip, day) {
           </button>
         </div>
       </div>
-      <div class="stop-list">${stops}</div>
+      <div class="stop-list" data-day-drop="${escapeAttribute(day.id)}">${stops}</div>
       ${renderStopForm(day)}
     </article>
   `;
 }
 
-function renderTripStop(day, stop) {
+function renderTripStop(trip, day, stop) {
   const attribution = stop.addedBy
     ? `<p class="trip-attribution">Added by ${escapeHTML(memberName(stop.addedBy))}${stop.source ? ` · ${escapeHTML(stop.source)}` : ""}</p>`
     : "";
+  const dayOptions = trip.days
+    .map(
+      (tripDay, index) =>
+        `<option value="${escapeAttribute(tripDay.id)}" ${tripDay.id === day.id ? "selected" : ""}>${escapeHTML(tripDay.title || `Day ${index + 1}`)}</option>`,
+    )
+    .join("");
   return `
-    <article class="stop-card ${escapeAttribute(stop.type)}">
+    <article class="stop-card ${escapeAttribute(stop.type)}" draggable="true" data-stop-drag="${escapeAttribute(stop.id)}" data-day-id="${escapeAttribute(day.id)}" title="Drag to another day">
       <div>
         <span class="badge">${tripStopTypeLabel(stop.type)}</span>
         <strong>${escapeHTML(stop.time ? `${stop.time} · ${stop.name}` : stop.name)}</strong>
@@ -1511,6 +1531,9 @@ function renderTripStop(day, stop) {
         ${attribution}
       </div>
       <div class="detail-actions">
+        <select class="move-stop-select" data-stop-move="${escapeAttribute(stop.id)}" data-day-id="${escapeAttribute(day.id)}" title="Move to day" aria-label="Move stop to day">
+          ${dayOptions}
+        </select>
         ${stop.url ? `<a class="secondary-button" href="${escapeAttribute(stop.url)}" target="_blank" rel="noreferrer"><i data-lucide="external-link"></i>Link</a>` : ""}
         <button class="icon-button danger" type="button" data-day-id="${escapeAttribute(day.id)}" data-stop-delete="${escapeAttribute(stop.id)}" title="Delete stop" aria-label="Delete stop">
           <i data-lucide="trash-2"></i>
@@ -1660,6 +1683,69 @@ function addStopToDay(event) {
     source: "Manual add",
   });
   day.stops.sort((a, b) => a.time.localeCompare(b.time));
+  trip.updatedAt = new Date().toISOString();
+  saveState();
+  renderTrips();
+}
+
+function handleTripStopDragStart(event) {
+  const card = event.currentTarget;
+  card.classList.add("dragging");
+  event.dataTransfer.effectAllowed = "move";
+  event.dataTransfer.setData(
+    "application/json",
+    JSON.stringify({
+      sourceDayId: card.dataset.dayId,
+      stopId: card.dataset.stopDrag,
+    }),
+  );
+}
+
+function handleTripStopDragEnd(event) {
+  event.currentTarget.classList.remove("dragging");
+  elements.tripDetail.querySelectorAll(".drag-over").forEach((item) => item.classList.remove("drag-over"));
+}
+
+function handleTripStopDragOver(event) {
+  event.preventDefault();
+  event.currentTarget.classList.add("drag-over");
+  event.dataTransfer.dropEffect = "move";
+}
+
+function handleTripStopDragLeave(event) {
+  if (!event.currentTarget.contains(event.relatedTarget)) {
+    event.currentTarget.classList.remove("drag-over");
+  }
+}
+
+function handleTripStopDrop(event) {
+  event.preventDefault();
+  event.stopPropagation();
+  const targetDayId = event.currentTarget.dataset.dayDrop;
+  event.currentTarget.classList.remove("drag-over");
+
+  try {
+    const payload = JSON.parse(event.dataTransfer.getData("application/json") || "{}");
+    moveStopToDay(payload.sourceDayId, payload.stopId, targetDayId);
+  } catch (error) {
+    console.warn("Could not move trip stop", error);
+  }
+}
+
+function moveStopToDay(sourceDayId, stopId, targetDayId) {
+  if (!sourceDayId || !stopId || !targetDayId || sourceDayId === targetDayId) return;
+
+  const trip = getSelectedTrip();
+  const sourceDay = trip?.days.find((day) => day.id === sourceDayId);
+  const targetDay = trip?.days.find((day) => day.id === targetDayId);
+  if (!trip || !sourceDay || !targetDay) return;
+
+  const stop = sourceDay.stops.find((item) => item.id === stopId);
+  if (!stop) return;
+
+  sourceDay.stops = sourceDay.stops.filter((item) => item.id !== stopId);
+  targetDay.stops.push(stop);
+  targetDay.stops.sort((a, b) => a.time.localeCompare(b.time));
   trip.updatedAt = new Date().toISOString();
   saveState();
   renderTrips();
