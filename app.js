@@ -105,7 +105,6 @@ const elements = {
   authGate: document.querySelector("#authGate"),
   authGoogleBtn: document.querySelector("#authGoogleBtn"),
   authStatus: document.querySelector("#authStatus"),
-  cloudStatusBtn: document.querySelector("#cloudStatusBtn"),
   currentProfileBtn: document.querySelector("#currentProfileBtn"),
   loginBtn: document.querySelector("#loginBtn"),
   memberStrip: document.querySelector("#memberStrip"),
@@ -175,6 +174,13 @@ const elements = {
   profileAdminPins: document.querySelector("#profileAdminPins"),
   closeProfileBtn: document.querySelector("#closeProfileBtn"),
   cancelProfileBtn: document.querySelector("#cancelProfileBtn"),
+  accountDialog: document.querySelector("#accountDialog"),
+  accountForm: document.querySelector("#accountForm"),
+  accountTitle: document.querySelector("#accountTitle"),
+  accountSummary: document.querySelector("#accountSummary"),
+  closeAccountBtn: document.querySelector("#closeAccountBtn"),
+  accountSyncBtn: document.querySelector("#accountSyncBtn"),
+  accountSettingsBtn: document.querySelector("#accountSettingsBtn"),
   cloudDialog: document.querySelector("#cloudDialog"),
   cloudForm: document.querySelector("#cloudForm"),
   cloudSummary: document.querySelector("#cloudSummary"),
@@ -471,8 +477,7 @@ function seedTasks() {
 }
 
 function bindEvents() {
-  elements.cloudStatusBtn.addEventListener("click", openCloudDialog);
-  elements.currentProfileBtn.addEventListener("click", openProfileDialog);
+  elements.currentProfileBtn.addEventListener("click", openAccountDialog);
   elements.loginBtn.addEventListener("click", () => openLoginDialog());
   elements.newTaskBtn.addEventListener("click", () => openTaskDialog());
   elements.newWishBtn.addEventListener("click", () => openWishDialog());
@@ -526,6 +531,20 @@ function bindEvents() {
 
   elements.profileName.addEventListener("input", renderProfilePreview);
   elements.profileColor.addEventListener("input", renderProfilePreview);
+
+  elements.accountForm.addEventListener("submit", (event) => event.preventDefault());
+  elements.closeAccountBtn.addEventListener("click", closeAccountDialog);
+  elements.accountSyncBtn.addEventListener("click", () => {
+    closeAccountDialog();
+    openCloudDialog();
+  });
+  elements.accountSettingsBtn.addEventListener("click", () => {
+    closeAccountDialog();
+    openProfileDialog();
+  });
+  elements.accountDialog.addEventListener("click", (event) => {
+    if (event.target === elements.accountDialog) closeAccountDialog();
+  });
 
   elements.cloudForm.addEventListener("submit", (event) => event.preventDefault());
   elements.authGoogleBtn.addEventListener("click", signInWithGoogle);
@@ -728,22 +747,7 @@ function saveCloudState(force = false) {
 }
 
 function renderCloudStatus() {
-  if (!elements.cloudStatusBtn) return;
-
-  if (!cloudState.configured) {
-    elements.cloudStatusBtn.className = "cloud-button warning";
-    elements.cloudStatusBtn.innerHTML = `<i data-lucide="cloud-off"></i> Local`;
-    refreshIcons();
-    return;
-  }
-
-  if (cloudState.user) {
-    elements.cloudStatusBtn.className = "cloud-button connected";
-    elements.cloudStatusBtn.innerHTML = `<i data-lucide="cloud"></i> Synced`;
-  } else {
-    elements.cloudStatusBtn.className = "cloud-button";
-    elements.cloudStatusBtn.innerHTML = `<i data-lucide="cloud"></i> Sign in`;
-  }
+  renderCurrentProfile();
   refreshIcons();
 }
 
@@ -806,6 +810,33 @@ function closeCloudDialog() {
   elements.cloudDialog.close();
   elements.cloudForm.reset();
   elements.cloudError.textContent = "";
+}
+
+function openAccountDialog() {
+  const member = currentMember();
+  elements.accountTitle.textContent = member.name;
+  renderAccountDialog();
+  elements.accountDialog.showModal();
+  elements.accountSyncBtn.focus();
+  refreshIcons();
+}
+
+function renderAccountDialog() {
+  const member = currentMember();
+  elements.accountSummary.innerHTML = `
+    <div class="profile-preview compact">
+      <span class="avatar" style="background:${member.color}">${initials(member.name)}</span>
+      <div>
+        <strong>${escapeHTML(member.name)}</strong>
+        <span>${escapeHTML(syncStatusDetail())}</span>
+      </div>
+    </div>
+  `;
+}
+
+function closeAccountDialog() {
+  elements.accountDialog.close();
+  elements.accountForm.reset();
 }
 
 function signInWithGoogle() {
@@ -880,11 +911,12 @@ function saveState() {
 
 function renderCurrentProfile() {
   const member = currentMember();
+  const sync = syncStatusSummary();
   elements.currentProfileBtn.innerHTML = `
     <span class="avatar" style="background:${member.color}">${initials(member.name)}</span>
     <span>
       <strong>${escapeHTML(member.name)}</strong>
-      <small>Profile</small>
+      <small class="${sync.className}">${escapeHTML(sync.label)}</small>
     </span>
   `;
 }
@@ -3218,6 +3250,20 @@ function memberName(id) {
 
 function memberEmail(id) {
   return getMember(id)?.email ?? "";
+}
+
+function syncStatusSummary() {
+  if (!cloudState.configured) return { label: "Local", className: "sync-local" };
+  if (cloudState.error) return { label: "Sync issue", className: "sync-warning" };
+  if (cloudState.user) return { label: "Synced", className: "sync-connected" };
+  return { label: "Sign in", className: "sync-local" };
+}
+
+function syncStatusDetail() {
+  if (!cloudState.configured) return "Local mode. Add Firebase config to use Cloud sync.";
+  if (cloudState.error) return `Cloud sync needs attention: ${cloudState.error}`;
+  if (cloudState.user) return `Cloud sync on as ${cloudState.user.email || "Google user"}`;
+  return "Cloud sync is ready. Sign in with Google to share family data.";
 }
 
 function memberIdForGoogleUser(user, members = state.members) {

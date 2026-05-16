@@ -41,10 +41,6 @@
         <h1>Family Hub</h1>
       </div>
       <div class="header-actions">
-        <button class="cloud-button" id="cloudStatusBtn" type="button">
-          <i data-lucide="cloud-off"></i>
-          Local
-        </button>
         <button class="profile-button" id="currentProfileBtn" type="button"></button>
         <button class="secondary-button" id="loginBtn" type="button">
           <i data-lucide="user-round-cog"></i>
@@ -493,12 +489,39 @@
       </form>
     </dialog>
 
+    <dialog id="accountDialog" class="task-dialog account-dialog">
+      <form id="accountForm" method="dialog">
+        <div class="dialog-heading">
+          <div>
+            <p class="eyebrow">Account</p>
+            <h2 id="accountTitle">Profile</h2>
+          </div>
+          <button class="icon-button" id="closeAccountBtn" value="cancel" type="button" title="Close" aria-label="Close">
+            <i data-lucide="x">×</i>
+          </button>
+        </div>
+
+        <div class="cloud-summary" id="accountSummary"></div>
+
+        <div class="account-actions">
+          <button class="secondary-button" id="accountSyncBtn" type="button">
+            <i data-lucide="cloud"></i>
+            Cloud sync
+          </button>
+          <button class="secondary-button" id="accountSettingsBtn" type="button">
+            <i data-lucide="settings"></i>
+            Profile settings
+          </button>
+        </div>
+      </form>
+    </dialog>
+
     <dialog id="cloudDialog" class="task-dialog">
       <form id="cloudForm" method="dialog">
         <div class="dialog-heading">
           <div>
             <p class="eyebrow">Shared family data</p>
-            <h2>Firebase sync</h2>
+            <h2>Cloud sync</h2>
           </div>
           <button class="icon-button" id="closeCloudBtn" value="cancel" type="button" title="Close" aria-label="Close">
             <i data-lucide="x">×</i>
