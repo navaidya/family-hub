@@ -28,6 +28,12 @@ const wishStatuses = [
   { id: "done", label: "Done" },
 ];
 
+const mainViews = [
+  { id: "tasks", label: "Tasks", icon: "list-checks" },
+  { id: "wishlist", label: "Wishlist", icon: "sparkles" },
+  { id: "vacation", label: "Vacation", icon: "map" },
+];
+
 const familyMembers = [
   {
     id: "me",
@@ -79,6 +85,8 @@ const isoToday = toISODate(today);
 
 let state = loadState();
 let activeStatus = "all";
+let activeMainView = "tasks";
+let activeWishMemberId = state.currentMemberId || "me";
 let selectedTaskId = state.tasks[0]?.id ?? null;
 let selectedTripId = state.trips?.[0]?.id ?? null;
 let selectedWishId = state.wishes?.[0]?.id ?? null;
@@ -94,7 +102,12 @@ const elements = {
   currentProfileBtn: document.querySelector("#currentProfileBtn"),
   loginBtn: document.querySelector("#loginBtn"),
   memberStrip: document.querySelector("#memberStrip"),
+  mainTabs: document.querySelector("#mainTabs"),
+  taskView: document.querySelector("#taskView"),
+  wishlistView: document.querySelector("#wishlistView"),
+  vacationView: document.querySelector("#vacationView"),
   newWishBtn: document.querySelector("#newWishBtn"),
+  wishTabs: document.querySelector("#wishTabs"),
   wishList: document.querySelector("#wishList"),
   wishDetail: document.querySelector("#wishDetail"),
   newTripBtn: document.querySelector("#newTripBtn"),
@@ -820,6 +833,7 @@ function render() {
   renderCloudStatus();
   renderCurrentProfile();
   renderMemberStrip();
+  renderMainTabs();
   renderWishes();
   renderTrips();
   renderStatusTabs();
@@ -874,25 +888,62 @@ function renderMemberStrip() {
   });
 }
 
+function renderMainTabs() {
+  elements.mainTabs.innerHTML = mainViews
+    .map((view) => {
+      const count =
+        {
+          tasks: state.tasks.filter((task) => task.status !== "done").length,
+          wishlist: state.wishes.filter((wish) => wish.status !== "done").length,
+          vacation: state.trips.length,
+        }[view.id] ?? 0;
+      return `
+        <button class="main-tab ${activeMainView === view.id ? "active" : ""}" type="button" data-main-view="${view.id}">
+          <i data-lucide="${view.icon}"></i>
+          <span>${view.label}</span>
+          <strong>${count}</strong>
+        </button>
+      `;
+    })
+    .join("");
+
+  elements.taskView.hidden = activeMainView !== "tasks";
+  elements.wishlistView.hidden = activeMainView !== "wishlist";
+  elements.vacationView.hidden = activeMainView !== "vacation";
+
+  elements.mainTabs.querySelectorAll("[data-main-view]").forEach((button) => {
+    button.addEventListener("click", () => {
+      activeMainView = button.dataset.mainView;
+      renderMainTabs();
+      refreshIcons();
+    });
+  });
+}
+
 function renderWishes() {
-  if (!state.wishes.length) {
-    elements.wishList.innerHTML = `<div class="empty-state compact">No wishes yet.</div>`;
+  renderWishTabs();
+  const wishes = getSortedWishes().filter((wish) => wish.owner === activeWishMemberId);
+  const activeMember = getMember(activeWishMemberId) || currentMember();
+
+  if (!wishes.length) {
+    selectedWishId = null;
+    elements.wishList.innerHTML = `<div class="empty-state compact">No wishes for ${escapeHTML(activeMember.name)} yet.</div>`;
     elements.wishDetail.innerHTML = `
       <div class="empty-detail compact-detail">
         <i data-lucide="sparkles"></i>
-        <h2>Share a wish</h2>
-        <p>Add dinners, hikes, movies, vacations, gifts, or anything someone wants the family to understand.</p>
+        <h2>${escapeHTML(activeMember.name)}'s wishlist</h2>
+        <p>Add dinners, hikes, movies, vacations, gifts, or anything the family should understand.</p>
       </div>
     `;
     refreshIcons();
     return;
   }
 
-  if (!getSelectedWish()) {
-    selectedWishId = state.wishes[0].id;
+  if (!wishes.some((wish) => wish.id === selectedWishId)) {
+    selectedWishId = wishes[0].id;
   }
 
-  elements.wishList.innerHTML = getSortedWishes()
+  elements.wishList.innerHTML = wishes
     .map((wish) => {
       const owner = getMember(wish.owner);
       const targetDate = wish.targetDate ? formatShortDate(wish.targetDate) : "No date";
@@ -917,6 +968,32 @@ function renderWishes() {
   });
 
   renderWishDetail();
+}
+
+function renderWishTabs() {
+  if (!getMember(activeWishMemberId)) {
+    activeWishMemberId = state.currentMemberId || state.members[0]?.id || "me";
+  }
+
+  elements.wishTabs.innerHTML = state.members
+    .map((member) => {
+      const count = state.wishes.filter((wish) => wish.owner === member.id && wish.status !== "done").length;
+      return `
+        <button class="segment ${activeWishMemberId === member.id ? "active" : ""}" type="button" data-wish-member="${member.id}">
+          ${escapeHTML(member.name)} ${count}
+        </button>
+      `;
+    })
+    .join("");
+
+  elements.wishTabs.querySelectorAll("[data-wish-member]").forEach((button) => {
+    button.addEventListener("click", () => {
+      activeWishMemberId = button.dataset.wishMember;
+      selectedWishId = null;
+      renderWishes();
+      refreshIcons();
+    });
+  });
 }
 
 function renderWishDetail() {
@@ -1347,6 +1424,10 @@ function loginAsSelectedMember(event) {
   }
 
   state.currentMemberId = member.id;
+  if (activeMainView === "wishlist") {
+    activeWishMemberId = member.id;
+    selectedWishId = null;
+  }
   saveState();
   closeLoginDialog();
   render();
@@ -1459,6 +1540,7 @@ function closeProfileDialog() {
 
 function renderStatusTabs() {
   elements.statusTabs.innerHTML = statuses
+    .filter((status) => status.id !== "done")
     .map((status) => {
       const count = status.id === "all" ? state.tasks.length : state.tasks.filter((task) => task.status === status.id).length;
       return `
@@ -1695,7 +1777,9 @@ function renderCalendar() {
 
   elements.calendarGrid.querySelectorAll("[data-task-id]").forEach((button) => {
     button.addEventListener("click", () => {
+      activeMainView = "tasks";
       selectedTaskId = button.dataset.taskId;
+      renderMainTabs();
       renderTasks();
       renderDetail();
       window.scrollTo({ top: 0, behavior: "smooth" });
@@ -1704,7 +1788,9 @@ function renderCalendar() {
 
   elements.calendarGrid.querySelectorAll("[data-calendar-trip]").forEach((button) => {
     button.addEventListener("click", () => {
+      activeMainView = "vacation";
       selectedTripId = button.dataset.calendarTrip;
+      renderMainTabs();
       renderTrips();
       elements.tripDetail.scrollIntoView({ behavior: "smooth", block: "start" });
     });
@@ -1712,7 +1798,10 @@ function renderCalendar() {
 
   elements.calendarGrid.querySelectorAll("[data-calendar-wish]").forEach((button) => {
     button.addEventListener("click", () => {
+      activeMainView = "wishlist";
       selectedWishId = button.dataset.calendarWish;
+      activeWishMemberId = getSelectedWish()?.owner || activeWishMemberId;
+      renderMainTabs();
       renderWishes();
       elements.wishDetail.scrollIntoView({ behavior: "smooth", block: "start" });
     });
@@ -1868,7 +1957,7 @@ function renderAssistantSuggestions() {
     "What is due this week?",
     "Who has overdue tasks?",
     "Show unassigned tasks",
-    "Show family wishlist",
+    "Show wishlist",
     "Create tasks: Dentist appointment tomorrow",
   ];
 
@@ -1935,7 +2024,7 @@ function answerFamilyQuestion(question) {
     }
 
     const matchingWishes = searchWishes(normalized, wishes);
-    return formatWishAnswer("Family Wishlist", matchingWishes.length ? matchingWishes : wishes);
+    return formatWishAnswer("Wishlist", matchingWishes.length ? matchingWishes : wishes);
   }
 
   if (mentionsNotebook(normalized)) {
@@ -2544,7 +2633,7 @@ function openWishDialog(wish = null) {
 
   wishForm.id.value = wish?.id ?? "";
   wishForm.title.value = wish?.title ?? "";
-  wishForm.owner.value = wish?.owner ?? state.currentMemberId;
+  wishForm.owner.value = wish?.owner ?? activeWishMemberId ?? state.currentMemberId;
   wishForm.category.value = wish?.category ?? "experience";
   wishForm.status.value = wish?.status ?? "wish";
   wishForm.targetDate.value = wish?.targetDate ?? "";
@@ -2586,6 +2675,7 @@ function saveWishFromForm(event) {
     state.wishes.unshift(wish);
   }
 
+  activeWishMemberId = wish.owner;
   selectedWishId = id;
   saveState();
   closeWishDialog();
@@ -2756,13 +2846,13 @@ function makeTaskFromWish(wishId) {
     assignee: "",
     dueDate: wish.targetDate || addDays(isoToday, 7),
     priority: "normal",
-    description: `Created from Family Wishlist.\n\nCategory: ${wishCategoryLabel(wish.category)}\nWish details:\n${wish.details || "No details added."}`,
+    description: `Created from Wishlist.\n\nCategory: ${wishCategoryLabel(wish.category)}\nWish details:\n${wish.details || "No details added."}`,
     comments: [
       {
         id: crypto.randomUUID(),
         author: state.currentMemberId,
         createdAt: now,
-        text: "Created from a Family Wishlist item.",
+        text: "Created from a Wishlist item.",
       },
     ],
     createdAt: now,
@@ -2772,6 +2862,7 @@ function makeTaskFromWish(wishId) {
   state.tasks.unshift(task);
   wish.status = "planned";
   wish.updatedAt = now;
+  activeMainView = "tasks";
   selectedTaskId = task.id;
   saveState();
   render();

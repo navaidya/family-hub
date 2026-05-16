@@ -67,28 +67,31 @@
     <main class="app-shell">
       <section class="member-strip" id="memberStrip" aria-label="Family members"></section>
 
-      <section class="wishlist-panel" aria-label="Family wishlist">
+      <nav class="main-tabs" id="mainTabs" aria-label="Main sections"></nav>
+
+      <section class="wishlist-panel tab-view" id="wishlistView" aria-label="Wishlist">
         <div class="panel-heading">
           <div>
             <p class="eyebrow">Dreams and wishes</p>
-            <h2>Family Wishlist</h2>
+            <h2>Wishlist</h2>
           </div>
           <button class="primary-button" id="newWishBtn" type="button">
             <i data-lucide="sparkles"></i>
             New wish
           </button>
         </div>
+        <nav class="segmented-control member-filter-tabs" id="wishTabs" aria-label="Wishlist member filters"></nav>
         <div class="wishlist-grid">
           <div class="wish-list" id="wishList"></div>
           <div class="wish-detail" id="wishDetail"></div>
         </div>
       </section>
 
-      <section class="travel-panel" aria-label="Family vacation plans">
+      <section class="travel-panel tab-view" id="vacationView" aria-label="Vacation plans">
         <div class="panel-heading">
           <div>
             <p class="eyebrow">Vacation plans</p>
-            <h2>Family travel</h2>
+            <h2>Vacation</h2>
           </div>
           <button class="primary-button" id="newTripBtn" type="button">
             <i data-lucide="map-plus"></i>
@@ -101,12 +104,12 @@
         </div>
       </section>
 
-      <section class="dashboard-grid">
+      <section class="dashboard-grid tab-view" id="taskView">
         <section class="task-panel" aria-label="Task lists">
           <div class="panel-heading">
             <div>
               <p class="eyebrow">Main page</p>
-              <h2>Tasks and asks</h2>
+              <h2>Tasks</h2>
             </div>
             <div class="search-control">
               <i data-lucide="search"></i>
@@ -283,7 +286,7 @@
       <form id="wishForm" method="dialog">
         <div class="dialog-heading">
           <div>
-            <p class="eyebrow">Family Wishlist</p>
+            <p class="eyebrow">Wishlist</p>
             <h2 id="wishDialogTitle">New wish</h2>
           </div>
           <button class="icon-button" id="closeWishDialogBtn" value="cancel" type="button" title="Close" aria-label="Close">

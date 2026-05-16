@@ -306,6 +306,58 @@ label.import-button {
   border-color: #9db6c9;
 }
 
+.main-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.84);
+  box-shadow: var(--shadow);
+}
+
+.main-tab {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 0 12px;
+  border-radius: 8px;
+  color: var(--ink);
+  background: transparent;
+  font-weight: 900;
+}
+
+.main-tab:hover,
+.main-tab.active {
+  color: white;
+  background: var(--teal);
+}
+
+.main-tab svg {
+  width: 18px;
+  height: 18px;
+}
+
+.main-tab strong {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  color: var(--ink);
+  background: #e9eef4;
+  font-size: 0.78rem;
+}
+
+.main-tab.active strong {
+  color: var(--teal-dark);
+  background: white;
+}
+
 .avatar {
   display: grid;
   place-items: center;
@@ -387,6 +439,10 @@ label.import-button {
   display: grid;
   grid-template-columns: minmax(220px, 0.34fr) minmax(0, 1fr);
   gap: 14px;
+}
+
+.member-filter-tabs {
+  margin-bottom: 14px;
 }
 
 .wishlist-grid {
@@ -1371,6 +1427,26 @@ label.import-button {
   .member-strip {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 8px;
+  }
+
+  .main-tabs {
+    gap: 6px;
+    padding: 6px;
+  }
+
+  .main-tab {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    gap: 4px;
+    min-height: 70px;
+    padding: 8px 6px;
+    text-align: center;
+  }
+
+  .main-tab strong {
+    height: 22px;
+    min-width: 22px;
+    font-size: 0.72rem;
   }
 
   .member-tile {
