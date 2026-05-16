@@ -2,6 +2,7 @@ const STORAGE_KEY = "family-hub-state-v1";
 const LEGACY_STORAGE_KEY = "family-planner-state-v1";
 const LOCAL_PROFILE_KEY = "family-hub-local-profile-v1";
 const ADMIN_MEMBER_ID = "me";
+const HOME_ADDRESS = "4226 Passeggi Ct, Pleasanton, CA";
 
 const statuses = [
   { id: "all", label: "All" },
@@ -4572,6 +4573,7 @@ function renderTripMapLinks(trip) {
 
 function getTripMapPoints(trip) {
   const points = [
+    HOME_ADDRESS,
     trip.destination,
     ...trip.hotels.map((hotel) => hotel.address || hotel.name),
     ...trip.days.flatMap((day) =>
