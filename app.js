@@ -28,6 +28,13 @@ const wishStatuses = [
   { id: "done", label: "Done" },
 ];
 
+const googleEmailMemberIds = {
+  "navalvaidya@gmail.com": "me",
+  "priyanka.naval.vaidya@gmail.com": "wife",
+  "vivaanvaidya@gmail.com": "son",
+  "yuvikavaidya@gmail.com": "daughter",
+};
+
 const mainViews = [
   { id: "tasks", label: "Tasks", icon: "list-checks" },
   { id: "wishlist", label: "Wishlist", icon: "sparkles" },
@@ -39,7 +46,7 @@ const familyMembers = [
     id: "me",
     name: "Naval",
     age: 46,
-    email: "me@example.com",
+    email: "navalvaidya@gmail.com",
     color: "#0f766e",
     pin: "1980",
     settings: { reminderDays: 7, includeInDigest: true },
@@ -48,7 +55,7 @@ const familyMembers = [
     id: "wife",
     name: "Priyanka",
     age: 43,
-    email: "wife@example.com",
+    email: "priyanka.naval.vaidya@gmail.com",
     color: "#4754a3",
     pin: "1983",
     settings: { reminderDays: 7, includeInDigest: true },
@@ -57,7 +64,7 @@ const familyMembers = [
     id: "son",
     name: "Vivan",
     age: 16,
-    email: "son@example.com",
+    email: "vivaanvaidya@gmail.com",
     color: "#d95f43",
     pin: "2010",
     settings: { reminderDays: 5, includeInDigest: true },
@@ -66,7 +73,7 @@ const familyMembers = [
     id: "daughter",
     name: "Yuvika",
     age: 9,
-    email: "daughter@example.com",
+    email: "yuvikavaidya@gmail.com",
     color: "#237a57",
     pin: "2017",
     settings: { reminderDays: 3, includeInDigest: true },
@@ -252,11 +259,14 @@ function normalizeMembers(savedMembers = []) {
     const saved = savedMembers.find((member) => member.id === defaultMember.id) ?? {};
     const savedName = saved.name ?? defaultMember.name;
     const shouldUseDefaultName = savedName === legacyNames[defaultMember.id];
+    const savedEmail = saved.email ?? defaultMember.email;
+    const shouldUseDefaultEmail = /@example\.com$/i.test(savedEmail);
 
     return {
       ...defaultMember,
       ...saved,
       name: shouldUseDefaultName ? defaultMember.name : savedName,
+      email: shouldUseDefaultEmail ? defaultMember.email : savedEmail,
       pin: normalizePin(saved.pin || defaultMember.pin),
       settings: {
         ...defaultMember.settings,
@@ -597,6 +607,8 @@ function initCloudSync() {
       }
 
       if (user) {
+        applySignedInProfile(user);
+        render();
         subscribeToFamilyDoc();
       }
 
@@ -645,13 +657,15 @@ function subscribeToFamilyDoc() {
 
 function applyRemoteFamilyData(data = {}) {
   cloudState.applyingRemote = true;
+  const members = normalizeMembers(data.members);
+  const signedInMemberId = memberIdForGoogleUser(cloudState.user, members);
   state = {
-    members: normalizeMembers(data.members),
+    members,
     tasks: normalizeTasks(data.tasks?.length ? data.tasks : []),
     notes: normalizeNotes(data.notes),
     trips: normalizeTrips(data.trips),
     wishes: normalizeWishes(data.wishes),
-    currentMemberId: localStorage.getItem(LOCAL_PROFILE_KEY) || state.currentMemberId || "me",
+    currentMemberId: signedInMemberId || localStorage.getItem(LOCAL_PROFILE_KEY) || state.currentMemberId || "me",
   };
 
   if (!getMember(state.currentMemberId)) {
@@ -674,6 +688,16 @@ function applyRemoteFamilyData(data = {}) {
   localStorage.setItem(LOCAL_PROFILE_KEY, state.currentMemberId);
   cloudState.applyingRemote = false;
   render();
+}
+
+function applySignedInProfile(user) {
+  const memberId = memberIdForGoogleUser(user, state.members);
+  if (!memberId || state.currentMemberId === memberId) return;
+
+  state.currentMemberId = memberId;
+  activeWishMemberId = memberId;
+  localStorage.setItem(LOCAL_PROFILE_KEY, memberId);
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
 }
 
 function queueCloudSave() {
@@ -3194,6 +3218,22 @@ function memberName(id) {
 
 function memberEmail(id) {
   return getMember(id)?.email ?? "";
+}
+
+function memberIdForGoogleUser(user, members = state.members) {
+  return memberIdForEmail(user?.email, members);
+}
+
+function memberIdForEmail(email, members = state.members) {
+  const normalizedEmail = normalizeEmail(email);
+  if (!normalizedEmail) return "";
+
+  const profileMatch = members.find((member) => normalizeEmail(member.email) === normalizedEmail);
+  return profileMatch?.id || googleEmailMemberIds[normalizedEmail] || "";
+}
+
+function normalizeEmail(email) {
+  return String(email || "").trim().toLowerCase();
 }
 
 function taskTypeLabel(type) {
