@@ -856,6 +856,11 @@ label.import-button {
   font-size: 0.9rem;
 }
 
+.trip-attribution {
+  font-size: 0.78rem !important;
+  font-weight: 800;
+}
+
 .trip-hero,
 .hotel-card,
 .trip-day-card,

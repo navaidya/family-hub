@@ -453,6 +453,9 @@ function normalizeTripStops(stops = []) {
     time: String(stop.time || "").trim(),
     url: String(stop.url || "").trim(),
     notes: String(stop.notes || "").trim(),
+    addedBy: getKnownMemberId(stop.addedBy) || "",
+    addedAt: stop.addedAt || "",
+    source: String(stop.source || "").trim(),
   }));
 }
 
@@ -1491,6 +1494,9 @@ function renderTripDayCard(trip, day) {
 }
 
 function renderTripStop(day, stop) {
+  const attribution = stop.addedBy
+    ? `<p class="trip-attribution">Added by ${escapeHTML(memberName(stop.addedBy))}${stop.source ? ` · ${escapeHTML(stop.source)}` : ""}</p>`
+    : "";
   return `
     <article class="stop-card ${escapeAttribute(stop.type)}">
       <div>
@@ -1498,6 +1504,7 @@ function renderTripStop(day, stop) {
         <strong>${escapeHTML(stop.time ? `${stop.time} · ${stop.name}` : stop.name)}</strong>
         <p>${escapeHTML(stop.address || "No address added.")}</p>
         ${stop.notes ? `<p>${escapeHTML(stop.notes)}</p>` : ""}
+        ${attribution}
       </div>
       <div class="detail-actions">
         ${stop.url ? `<a class="secondary-button" href="${escapeAttribute(stop.url)}" target="_blank" rel="noreferrer"><i data-lucide="external-link"></i>Link</a>` : ""}
@@ -1612,6 +1619,9 @@ function importGoogleMapsPlaces(event) {
       time: "",
       url: place.url,
       notes: "",
+      addedBy: state.currentMemberId,
+      addedAt: new Date().toISOString(),
+      source: "Google Maps import",
     }));
 
   if (!stops.length) {
@@ -1623,7 +1633,7 @@ function importGoogleMapsPlaces(event) {
   trip.updatedAt = new Date().toISOString();
   saveState();
   renderTrips();
-  window.alert(`Imported ${stops.length} sightseeing place${stops.length === 1 ? "" : "s"}.`);
+  window.alert(`Added ${stops.length} sightseeing place${stops.length === 1 ? "" : "s"}. Existing trip places were kept.`);
 }
 
 function addStopToDay(event) {
@@ -1641,6 +1651,9 @@ function addStopToDay(event) {
     address: String(data.get("address") || "").trim(),
     url: String(data.get("url") || "").trim(),
     notes: String(data.get("notes") || "").trim(),
+    addedBy: state.currentMemberId,
+    addedAt: new Date().toISOString(),
+    source: "Manual add",
   });
   day.stops.sort((a, b) => a.time.localeCompare(b.time));
   trip.updatedAt = new Date().toISOString();
@@ -1672,6 +1685,9 @@ function deleteStopFromDay(dayId, stopId) {
   const trip = getSelectedTrip();
   const day = trip?.days.find((item) => item.id === dayId);
   if (!day) return;
+  const stop = day.stops.find((item) => item.id === stopId);
+  const confirmed = window.confirm(`Remove "${stop?.name || "this place"}" from the trip?`);
+  if (!confirmed) return;
   day.stops = day.stops.filter((stop) => stop.id !== stopId);
   trip.updatedAt = new Date().toISOString();
   saveState();
