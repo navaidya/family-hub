@@ -1190,7 +1190,7 @@ function renderAssistantSuggestions() {
     "What is due this week?",
     "Who has overdue tasks?",
     "Show unassigned tasks",
-    "Show my notes",
+    "Create task from my notes",
   ];
 
   elements.assistantSuggestions.innerHTML = suggestions
@@ -1237,7 +1237,12 @@ function answerFamilyQuestion(question) {
   const activeTasks = tasks.filter((task) => task.status !== "done");
 
   if (mentionsHelp(normalized)) {
-    return "I can answer things like: what is due today, what is due this week, who owns a task, what is overdue, what is unassigned, show my notes, or summarize a family member's tasks.";
+    return "I can answer things like: what is due today, what is due this week, who owns a task, what is overdue, what is unassigned, show my notes, create a task from a note, or summarize a family member's tasks.";
+  }
+
+  if (mentionsTaskCreationFromNote(normalized)) {
+    const member = person || currentMember();
+    return createTaskFromNotebookQuestion(normalized, member);
   }
 
   if (mentionsNotebook(normalized)) {
@@ -1339,6 +1344,65 @@ function formatNotebookAnswer(member, notes) {
     .join("\n")}`;
 }
 
+function createTaskFromNotebookQuestion(text, member) {
+  const notes = getNotebookNotes(member.id);
+  if (!notes.length) return `${member.name}'s notebook has no notes to turn into a task.`;
+
+  const matches = searchNotes(text, notes);
+  const note = matches[0];
+  if (!note) return `I could not find a matching note in ${member.name}'s notebook.`;
+
+  const task = buildTaskFromNote(note, member, text);
+  state.tasks.unshift(task);
+  selectedTaskId = task.id;
+  saveState();
+  render();
+
+  return `Created task: ${task.title}\nDue: ${formatLongDate(task.dueDate)}\nRequested by: ${member.name}\nAssigned to: Unassigned`;
+}
+
+function buildTaskFromNote(note, member, question) {
+  const now = new Date().toISOString();
+  return {
+    id: crypto.randomUUID(),
+    title: deriveTaskTitleFromNote(note.text),
+    type: "todo",
+    status: "todo",
+    requester: member.id,
+    assignee: "",
+    dueDate: deriveDueDateFromQuestion(question),
+    priority: "normal",
+    description: `Created from ${member.name}'s notebook note:\n\n${note.text}`,
+    comments: [
+      {
+        id: crypto.randomUUID(),
+        author: state.currentMemberId,
+        createdAt: now,
+        text: "Created by Family Hub Assistant from a notebook note.",
+      },
+    ],
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
+function deriveTaskTitleFromNote(text) {
+  const firstLine = text
+    .split("\n")
+    .map((line) => line.trim())
+    .find(Boolean) || "Notebook follow-up";
+  const cleaned = firstLine.replace(/^[-*\d.)\s]+/, "");
+  const title = cleaned.length > 64 ? `${cleaned.slice(0, 61).trim()}...` : cleaned;
+  return title || "Notebook follow-up";
+}
+
+function deriveDueDateFromQuestion(text) {
+  if (mentionsToday(text)) return isoToday;
+  if (mentionsTomorrow(text)) return addDays(isoToday, 1);
+  if (mentionsWeek(text)) return addDays(isoToday, 7);
+  return addDays(isoToday, 7);
+}
+
 function formatPersonSummary(member, tasks) {
   if (!tasks.length) {
     return `${member.name} has no active assigned or requested tasks.`;
@@ -1413,6 +1477,18 @@ function mentionsNotebook(text) {
   return text.includes("note") || text.includes("notes") || text.includes("notebook");
 }
 
+function mentionsTaskCreationFromNote(text) {
+  const wantsTask = text.includes("task") || text.includes("todo") || text.includes("to do");
+  const wantsNote = mentionsNotebook(text);
+  const wantsCreate =
+    text.includes("create") ||
+    text.includes("make") ||
+    text.includes("add") ||
+    text.includes("turn") ||
+    text.includes("convert");
+  return wantsTask && wantsNote && wantsCreate;
+}
+
 function assistantStopWords() {
   return new Set([
     "what",
@@ -1422,8 +1498,16 @@ function assistantStopWords() {
     "whose",
     "which",
     "show",
+    "create",
+    "make",
+    "add",
+    "turn",
+    "convert",
+    "into",
+    "from",
     "task",
     "tasks",
+    "todo",
     "due",
     "date",
     "owner",
