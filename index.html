@@ -111,6 +111,27 @@
           </div>
           <div class="reminder-list" id="reminderList"></div>
         </section>
+
+        <section class="assistant-panel" aria-label="Family Hub Assistant">
+          <div class="panel-heading compact">
+            <div>
+              <p class="eyebrow">Search</p>
+              <h2>Family Hub Assistant</h2>
+            </div>
+            <button class="icon-button" id="assistantClearBtn" type="button" title="Clear chat" aria-label="Clear chat">
+              <i data-lucide="rotate-ccw"></i>
+            </button>
+          </div>
+          <div class="assistant-chat" id="assistantChat" aria-live="polite"></div>
+          <form class="assistant-form" id="assistantForm">
+            <input id="assistantInput" type="search" autocomplete="off" placeholder="Ask about tasks, due dates, or people" />
+            <button class="primary-button" type="submit">
+              <i data-lucide="send"></i>
+              Ask
+            </button>
+          </form>
+          <div class="assistant-suggestions" id="assistantSuggestions"></div>
+        </section>
       </section>
     </main>
 

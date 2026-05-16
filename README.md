@@ -4,6 +4,8 @@ A browser-based family hub with a task list, task discussion, assignment, calend
 
 Open `index.html` in a browser. Tasks are saved to local browser storage, and backup import/export is available from the header.
 
+The main page includes a local Family Hub Assistant for quick questions about current task data, such as due dates, ownership, overdue tasks, unassigned work, and per-person summaries. This assistant is rule-based and does not send family data to an AI service.
+
 Each family member has a local profile. Use **Switch** to log in as Naval, Priyanka, Vivan, or Yuvika, and use the current profile button to edit that member's name, age, email, color, optional PIN, reminder window, and digest preference. New tasks and comments default to the signed-in profile.
 
 Default household PINs are set for each member: Naval `1980`, Priyanka `1983`, Vivan `2010`, and Yuvika `2017`. Each member can change their own PIN from profile settings. Naval is the admin profile and can reset any family member's PIN from his profile settings.

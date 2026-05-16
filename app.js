@@ -122,6 +122,11 @@ const elements = {
   closeCloudBtn: document.querySelector("#closeCloudBtn"),
   cloudSignOutBtn: document.querySelector("#cloudSignOutBtn"),
   cloudSignUpBtn: document.querySelector("#cloudSignUpBtn"),
+  assistantChat: document.querySelector("#assistantChat"),
+  assistantForm: document.querySelector("#assistantForm"),
+  assistantInput: document.querySelector("#assistantInput"),
+  assistantClearBtn: document.querySelector("#assistantClearBtn"),
+  assistantSuggestions: document.querySelector("#assistantSuggestions"),
 };
 
 const form = {
@@ -305,6 +310,9 @@ function bindEvents() {
   elements.cloudDialog.addEventListener("click", (event) => {
     if (event.target === elements.cloudDialog) closeCloudDialog();
   });
+
+  elements.assistantForm.addEventListener("submit", askAssistant);
+  elements.assistantClearBtn.addEventListener("click", resetAssistant);
 }
 
 function registerServiceWorker() {
@@ -583,6 +591,7 @@ function render() {
   renderDetail();
   renderCalendar();
   renderReminders();
+  renderAssistantSuggestions();
   refreshIcons();
 }
 
@@ -1047,6 +1056,235 @@ function renderReminders() {
   });
 
   refreshIcons();
+}
+
+function resetAssistant() {
+  elements.assistantChat.innerHTML = "";
+  addAssistantMessage(
+    "assistant",
+    "Ask me about tasks, owners, due dates, overdue work, unassigned items, or a family member's summary.",
+  );
+}
+
+function renderAssistantSuggestions() {
+  const suggestions = [
+    "What is due this week?",
+    "Who has overdue tasks?",
+    "Show unassigned tasks",
+    "Summarize Naval's tasks",
+  ];
+
+  elements.assistantSuggestions.innerHTML = suggestions
+    .map((suggestion) => `<button class="assistant-suggestion" type="button" data-assistant-suggestion="${escapeAttribute(suggestion)}">${escapeHTML(suggestion)}</button>`)
+    .join("");
+
+  elements.assistantSuggestions.querySelectorAll("[data-assistant-suggestion]").forEach((button) => {
+    button.addEventListener("click", () => {
+      elements.assistantInput.value = button.dataset.assistantSuggestion;
+      elements.assistantForm.requestSubmit();
+    });
+  });
+
+  if (!elements.assistantChat.childElementCount) {
+    resetAssistant();
+  }
+}
+
+function askAssistant(event) {
+  event.preventDefault();
+  const question = elements.assistantInput.value.trim();
+  if (!question) return;
+
+  addAssistantMessage("user", question);
+  addAssistantMessage("assistant", answerFamilyQuestion(question));
+  elements.assistantInput.value = "";
+}
+
+function addAssistantMessage(role, text) {
+  const article = document.createElement("article");
+  article.className = `assistant-message ${role}`;
+  article.innerHTML = `
+    <strong>${role === "user" ? "You" : "Assistant"}</strong>
+    <p>${escapeHTML(text)}</p>
+  `;
+  elements.assistantChat.appendChild(article);
+  elements.assistantChat.scrollTop = elements.assistantChat.scrollHeight;
+}
+
+function answerFamilyQuestion(question) {
+  const normalized = question.toLowerCase();
+  const person = findMentionedMember(normalized);
+  const tasks = getSortedTasks();
+  const activeTasks = tasks.filter((task) => task.status !== "done");
+
+  if (mentionsHelp(normalized)) {
+    return "I can answer things like: what is due today, what is due this week, who owns a task, what is overdue, what is unassigned, or summarize a family member's tasks.";
+  }
+
+  if (mentionsOverdue(normalized)) {
+    return formatTaskAnswer("Overdue tasks", activeTasks.filter((task) => daysUntil(task.dueDate) < 0));
+  }
+
+  if (mentionsUnassigned(normalized)) {
+    return formatTaskAnswer("Unassigned tasks", activeTasks.filter((task) => !task.assignee));
+  }
+
+  if (mentionsToday(normalized)) {
+    return formatTaskAnswer("Due today", activeTasks.filter((task) => daysUntil(task.dueDate) === 0));
+  }
+
+  if (mentionsTomorrow(normalized)) {
+    return formatTaskAnswer("Due tomorrow", activeTasks.filter((task) => daysUntil(task.dueDate) === 1));
+  }
+
+  if (mentionsWeek(normalized) || mentionsUpcoming(normalized)) {
+    return formatTaskAnswer("Due in the next 7 days", activeTasks.filter((task) => {
+      const days = daysUntil(task.dueDate);
+      return days >= 0 && days <= 7;
+    }));
+  }
+
+  if (person) {
+    const memberTasks = activeTasks.filter((task) => task.assignee === person.id || (!task.assignee && task.requester === person.id));
+    return formatPersonSummary(person, memberTasks);
+  }
+
+  const matchingTasks = searchTasks(normalized, tasks);
+  if (matchingTasks.length) {
+    return formatTaskAnswer("Matching tasks", matchingTasks);
+  }
+
+  if (mentionsSummary(normalized)) {
+    return formatFamilySummary(activeTasks);
+  }
+
+  return "I did not find a matching task or person. Try asking “what is due this week?”, “who owns dentist?”, “summarize Vivan's tasks”, or “show unassigned tasks”.";
+}
+
+function findMentionedMember(text) {
+  return state.members.find((member) => text.includes(member.name.toLowerCase()));
+}
+
+function searchTasks(text, tasks) {
+  const terms = text
+    .replace(/[?.,]/g, " ")
+    .split(/\s+/)
+    .filter((term) => term.length > 2 && !assistantStopWords().has(term));
+
+  if (!terms.length) return [];
+
+  return tasks.filter((task) => {
+    const haystack = [
+      task.title,
+      task.description,
+      task.type,
+      task.status,
+      memberName(task.requester),
+      memberName(task.assignee),
+      formatLongDate(task.dueDate),
+    ]
+      .join(" ")
+      .toLowerCase();
+    return terms.some((term) => haystack.includes(term));
+  });
+}
+
+function formatPersonSummary(member, tasks) {
+  if (!tasks.length) {
+    return `${member.name} has no active assigned or requested tasks.`;
+  }
+
+  const assigned = tasks.filter((task) => task.assignee === member.id).length;
+  const requested = tasks.filter((task) => !task.assignee && task.requester === member.id).length;
+  return `${member.name} has ${tasks.length} active item${tasks.length === 1 ? "" : "s"}: ${assigned} assigned, ${requested} requested but unassigned.\n\n${formatTaskLines(tasks)}`;
+}
+
+function formatFamilySummary(tasks) {
+  if (!tasks.length) return "There are no active family tasks.";
+
+  const lines = state.members.map((member) => {
+    const count = tasks.filter((task) => task.assignee === member.id || (!task.assignee && task.requester === member.id)).length;
+    return `${member.name}: ${count}`;
+  });
+
+  const overdue = tasks.filter((task) => daysUntil(task.dueDate) < 0).length;
+  const unassigned = tasks.filter((task) => !task.assignee).length;
+  return `There are ${tasks.length} active family tasks.\n${lines.join("\n")}\nOverdue: ${overdue}\nUnassigned: ${unassigned}`;
+}
+
+function formatTaskAnswer(title, tasks) {
+  if (!tasks.length) return `${title}: none found.`;
+  return `${title}: ${tasks.length}\n\n${formatTaskLines(tasks)}`;
+}
+
+function formatTaskLines(tasks) {
+  return tasks
+    .slice(0, 8)
+    .map((task) => {
+      const owner = task.assignee ? memberName(task.assignee) : `Unassigned, requested by ${memberName(task.requester)}`;
+      return `- ${task.title}: ${owner}, ${formatDuePhrase(task.dueDate)}, ${statusLabel(task.status)}`;
+    })
+    .join("\n");
+}
+
+function mentionsHelp(text) {
+  return text.includes("help") || text.includes("what can you");
+}
+
+function mentionsOverdue(text) {
+  return text.includes("overdue") || text.includes("late");
+}
+
+function mentionsUnassigned(text) {
+  return text.includes("unassigned") || text.includes("not assigned") || text.includes("no owner");
+}
+
+function mentionsToday(text) {
+  return text.includes("today");
+}
+
+function mentionsTomorrow(text) {
+  return text.includes("tomorrow");
+}
+
+function mentionsWeek(text) {
+  return text.includes("week") || text.includes("7 days") || text.includes("seven days");
+}
+
+function mentionsUpcoming(text) {
+  return text.includes("upcoming") || text.includes("coming up") || text.includes("next");
+}
+
+function mentionsSummary(text) {
+  return text.includes("summary") || text.includes("summarize") || text.includes("overview");
+}
+
+function assistantStopWords() {
+  return new Set([
+    "what",
+    "when",
+    "where",
+    "who",
+    "whose",
+    "which",
+    "show",
+    "task",
+    "tasks",
+    "due",
+    "date",
+    "owner",
+    "owned",
+    "assigned",
+    "family",
+    "hub",
+    "the",
+    "and",
+    "for",
+    "with",
+    "about",
+    "summary",
+    "summarize",
+  ]);
 }
 
 function openTaskDialog(task = null) {
