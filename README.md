@@ -39,3 +39,7 @@ Family Hub can sync shared tasks and member settings through Firebase Authentica
 9. Open Family Hub, click the cloud button, and create/sign in with each family login.
 
 The website is still hosted by GitHub Pages. Firebase stores the shared family data in Google's cloud. The active profile on each device remains local so one person switching profiles does not change everyone else's current profile.
+
+## GitHub Pages deploy speed
+
+Family Hub is a static site and does not need a build step. The `.nojekyll` file tells GitHub Pages to skip Jekyll processing and serve the checked-in files directly.
