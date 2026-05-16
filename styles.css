@@ -266,13 +266,14 @@ label.import-button {
 }
 
 .lower-grid {
-  grid-template-columns: minmax(0, 1.1fr) minmax(280px, 0.65fr) minmax(320px, 0.8fr);
+  grid-template-columns: minmax(0, 1.05fr) minmax(260px, 0.62fr) minmax(300px, 0.72fr) minmax(320px, 0.78fr);
 }
 
 .task-panel,
 .detail-panel,
 .calendar-panel,
 .reminder-panel,
+.notebook-panel,
 .assistant-panel {
   min-width: 0;
   border: 1px solid var(--line);
@@ -284,6 +285,7 @@ label.import-button {
 .task-panel,
 .detail-panel,
 .reminder-panel,
+.notebook-panel,
 .assistant-panel {
   padding: 18px;
 }
@@ -459,6 +461,10 @@ label.import-button {
   text-align: center;
 }
 
+.empty-state.compact {
+  min-height: 120px;
+}
+
 .empty-detail svg {
   width: 42px;
   height: 42px;
@@ -556,6 +562,7 @@ label.import-button {
 
 .comment-form select,
 .comment-form input,
+.notebook-form textarea,
 .login-grid button,
 .task-dialog input,
 .task-dialog select,
@@ -572,6 +579,11 @@ label.import-button {
 .task-dialog input,
 .task-dialog select {
   padding: 0 10px;
+}
+
+.notebook-form textarea {
+  padding: 10px;
+  resize: vertical;
 }
 
 .task-dialog textarea {
@@ -805,6 +817,65 @@ label.import-button {
 
 .reminder-title {
   font-weight: 900;
+}
+
+.notebook-panel {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+}
+
+.notebook-form {
+  display: grid;
+  gap: 8px;
+}
+
+.notebook-form .primary-button {
+  justify-self: start;
+}
+
+.notebook-list {
+  display: grid;
+  gap: 10px;
+}
+
+.notebook-note {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.note-text {
+  margin: 0;
+  overflow-wrap: anywhere;
+  white-space: pre-line;
+}
+
+.note-footer,
+.note-actions {
+  display: flex;
+  align-items: center;
+}
+
+.note-footer {
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.note-actions {
+  gap: 6px;
+}
+
+.note-actions .icon-button {
+  width: 34px;
+  min-height: 34px;
+}
+
+.icon-button.danger {
+  color: var(--red);
 }
 
 .assistant-panel {

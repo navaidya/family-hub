@@ -88,6 +88,10 @@ const elements = {
   exportBtn: document.querySelector("#exportBtn"),
   importInput: document.querySelector("#importInput"),
   emailDigestBtn: document.querySelector("#emailDigestBtn"),
+  notebookTitle: document.querySelector("#notebookTitle"),
+  notebookForm: document.querySelector("#notebookForm"),
+  notebookInput: document.querySelector("#notebookInput"),
+  notebookList: document.querySelector("#notebookList"),
   prevMonthBtn: document.querySelector("#prevMonthBtn"),
   nextMonthBtn: document.querySelector("#nextMonthBtn"),
   todayBtn: document.querySelector("#todayBtn"),
@@ -155,6 +159,7 @@ function loadState() {
       return {
         members: normalizeMembers(parsed.members),
         tasks: normalizeTasks(parsed.tasks?.length ? parsed.tasks : seedTasks()),
+        notes: normalizeNotes(parsed.notes),
         currentMemberId: localStorage.getItem(LOCAL_PROFILE_KEY) || parsed.currentMemberId || "me",
       };
     } catch (error) {
@@ -165,6 +170,7 @@ function loadState() {
   return {
     members: normalizeMembers(),
     tasks: normalizeTasks(seedTasks()),
+    notes: normalizeNotes(),
     currentMemberId: localStorage.getItem(LOCAL_PROFILE_KEY) || "me",
   };
 }
@@ -197,6 +203,23 @@ function normalizeTasks(tasks = []) {
         "Son driving practice plan": "Vivan driving practice plan",
       }[task.title] ?? task.title,
   }));
+}
+
+function normalizeNotes(notes = {}) {
+  return familyMembers.reduce((notebooks, member) => {
+    const memberNotes = Array.isArray(notes?.[member.id]) ? notes[member.id] : [];
+    notebooks[member.id] = memberNotes
+      .filter((note) => note && typeof note.text === "string")
+      .map((note) => ({
+        id: note.id || crypto.randomUUID(),
+        text: note.text.trim(),
+        createdAt: note.createdAt || new Date().toISOString(),
+        updatedAt: note.updatedAt || note.createdAt || new Date().toISOString(),
+      }))
+      .filter((note) => note.text)
+      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+    return notebooks;
+  }, {});
 }
 
 function normalizePin(pin) {
@@ -275,6 +298,7 @@ function bindEvents() {
   elements.exportBtn.addEventListener("click", exportState);
   elements.importInput.addEventListener("change", importState);
   elements.emailDigestBtn.addEventListener("click", sendDigestEmail);
+  elements.notebookForm.addEventListener("submit", addNotebookNote);
   elements.prevMonthBtn.addEventListener("click", () => changeMonth(-1));
   elements.nextMonthBtn.addEventListener("click", () => changeMonth(1));
   elements.todayBtn.addEventListener("click", () => {
@@ -423,6 +447,7 @@ function applyRemoteFamilyData(data = {}) {
   state = {
     members: normalizeMembers(data.members),
     tasks: normalizeTasks(data.tasks?.length ? data.tasks : []),
+    notes: normalizeNotes(data.notes),
     currentMemberId: localStorage.getItem(LOCAL_PROFILE_KEY) || state.currentMemberId || "me",
   };
 
@@ -453,6 +478,7 @@ function saveCloudState(force = false) {
   const payload = {
     members: state.members,
     tasks: state.tasks,
+    notes: state.notes,
     updatedBy: cloudState.user.email || cloudState.user.uid,
     updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
   };
@@ -591,6 +617,7 @@ function render() {
   renderDetail();
   renderCalendar();
   renderReminders();
+  renderNotebook();
   renderAssistantSuggestions();
   refreshIcons();
 }
@@ -1058,11 +1085,103 @@ function renderReminders() {
   refreshIcons();
 }
 
+function renderNotebook() {
+  const member = currentMember();
+  const notes = getNotebookNotes(member.id);
+  elements.notebookTitle.textContent = `${member.name}'s notebook`;
+
+  if (!notes.length) {
+    elements.notebookList.innerHTML = `<div class="empty-state compact">No notes yet.</div>`;
+    return;
+  }
+
+  elements.notebookList.innerHTML = notes
+    .map(
+      (note) => `
+        <article class="notebook-note">
+          <p class="note-text">${escapeHTML(note.text)}</p>
+          <div class="note-footer">
+            <span class="reminder-meta">${formatDateTime(note.updatedAt)}</span>
+            <span class="note-actions">
+              <button class="icon-button" type="button" data-note-edit="${escapeAttribute(note.id)}" title="Edit note" aria-label="Edit note">
+                <i data-lucide="pencil"></i>
+              </button>
+              <button class="icon-button danger" type="button" data-note-delete="${escapeAttribute(note.id)}" title="Delete note" aria-label="Delete note">
+                <i data-lucide="trash-2"></i>
+              </button>
+            </span>
+          </div>
+        </article>
+      `,
+    )
+    .join("");
+
+  elements.notebookList.querySelectorAll("[data-note-edit]").forEach((button) => {
+    button.addEventListener("click", () => editNotebookNote(button.dataset.noteEdit));
+  });
+
+  elements.notebookList.querySelectorAll("[data-note-delete]").forEach((button) => {
+    button.addEventListener("click", () => deleteNotebookNote(button.dataset.noteDelete));
+  });
+
+  refreshIcons();
+}
+
+function addNotebookNote(event) {
+  event.preventDefault();
+  const text = elements.notebookInput.value.trim();
+  if (!text) return;
+
+  const now = new Date().toISOString();
+  getNotebookNotes(state.currentMemberId).unshift({
+    id: crypto.randomUUID(),
+    text,
+    createdAt: now,
+    updatedAt: now,
+  });
+
+  elements.notebookInput.value = "";
+  saveState();
+  renderNotebook();
+}
+
+function editNotebookNote(id) {
+  const notes = getNotebookNotes(state.currentMemberId);
+  const note = notes.find((item) => item.id === id);
+  if (!note) return;
+
+  const updatedText = window.prompt("Edit note", note.text);
+  if (updatedText === null) return;
+  const text = updatedText.trim();
+  if (!text) {
+    window.alert("Notes cannot be blank. Delete the note if you no longer need it.");
+    return;
+  }
+
+  note.text = text;
+  note.updatedAt = new Date().toISOString();
+  notes.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  saveState();
+  renderNotebook();
+}
+
+function deleteNotebookNote(id) {
+  const notes = getNotebookNotes(state.currentMemberId);
+  const note = notes.find((item) => item.id === id);
+  if (!note) return;
+  const confirmed = window.confirm("Delete this note?");
+  if (!confirmed) return;
+
+  state.notes[state.currentMemberId] = notes.filter((item) => item.id !== id);
+  saveState();
+  renderNotebook();
+}
+
 function resetAssistant() {
   elements.assistantChat.innerHTML = "";
   addAssistantMessage(
     "assistant",
-    "Ask me about tasks, owners, due dates, overdue work, unassigned items, or a family member's summary.",
+    "Ask me about tasks, owners, due dates, overdue work, unassigned items, notes, or a family member's summary.",
   );
 }
 
@@ -1071,7 +1190,7 @@ function renderAssistantSuggestions() {
     "What is due this week?",
     "Who has overdue tasks?",
     "Show unassigned tasks",
-    "Summarize Naval's tasks",
+    "Show my notes",
   ];
 
   elements.assistantSuggestions.innerHTML = suggestions
@@ -1118,7 +1237,13 @@ function answerFamilyQuestion(question) {
   const activeTasks = tasks.filter((task) => task.status !== "done");
 
   if (mentionsHelp(normalized)) {
-    return "I can answer things like: what is due today, what is due this week, who owns a task, what is overdue, what is unassigned, or summarize a family member's tasks.";
+    return "I can answer things like: what is due today, what is due this week, who owns a task, what is overdue, what is unassigned, show my notes, or summarize a family member's tasks.";
+  }
+
+  if (mentionsNotebook(normalized)) {
+    const member = person || currentMember();
+    const notes = searchNotes(normalized, getNotebookNotes(member.id));
+    return formatNotebookAnswer(member, notes);
   }
 
   if (mentionsOverdue(normalized)) {
@@ -1187,6 +1312,31 @@ function searchTasks(text, tasks) {
       .toLowerCase();
     return terms.some((term) => haystack.includes(term));
   });
+}
+
+function searchNotes(text, notes) {
+  const terms = text
+    .replace(/[?.,]/g, " ")
+    .split(/\s+/)
+    .filter((term) => term.length > 2 && !assistantStopWords().has(term));
+
+  if (!terms.length) return notes;
+
+  const matches = notes.filter((note) => {
+    const haystack = `${note.text} ${formatDateTime(note.updatedAt)}`.toLowerCase();
+    return terms.some((term) => haystack.includes(term));
+  });
+
+  return matches.length ? matches : notes;
+}
+
+function formatNotebookAnswer(member, notes) {
+  if (!notes.length) return `${member.name}'s notebook has no notes yet.`;
+
+  return `${member.name}'s notebook: ${notes.length} note${notes.length === 1 ? "" : "s"}\n\n${notes
+    .slice(0, 5)
+    .map((note) => `- ${note.text} (${formatDateTime(note.updatedAt)})`)
+    .join("\n")}`;
 }
 
 function formatPersonSummary(member, tasks) {
@@ -1259,6 +1409,10 @@ function mentionsSummary(text) {
   return text.includes("summary") || text.includes("summarize") || text.includes("overview");
 }
 
+function mentionsNotebook(text) {
+  return text.includes("note") || text.includes("notes") || text.includes("notebook");
+}
+
 function assistantStopWords() {
   return new Set([
     "what",
@@ -1280,8 +1434,13 @@ function assistantStopWords() {
     "the",
     "and",
     "for",
+    "my",
+    "me",
     "with",
     "about",
+    "note",
+    "notes",
+    "notebook",
     "summary",
     "summarize",
   ]);
@@ -1468,6 +1627,7 @@ function importState(event) {
       state = {
         members: normalizeMembers(imported.members),
         tasks: normalizeTasks(imported.tasks),
+        notes: normalizeNotes(imported.notes),
         currentMemberId: imported.currentMemberId || "me",
       };
       selectedTaskId = state.tasks[0]?.id ?? null;
@@ -1490,6 +1650,18 @@ function changeMonth(delta) {
 
 function getSelectedTask() {
   return state.tasks.find((task) => task.id === selectedTaskId) ?? null;
+}
+
+function getNotebookNotes(memberId = state.currentMemberId) {
+  if (!state.notes) {
+    state.notes = normalizeNotes();
+  }
+
+  if (!Array.isArray(state.notes[memberId])) {
+    state.notes[memberId] = [];
+  }
+
+  return state.notes[memberId];
 }
 
 function getSortedTasks() {
