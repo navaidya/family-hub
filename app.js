@@ -1337,7 +1337,7 @@ function renderTripDetail() {
   const trip = getSelectedTrip();
   if (!trip) return;
 
-  const destinationLinks = renderMapLinks(`${trip.destination}`, "Destination map");
+  const tripMapLinks = renderTripMapLinks(trip);
   const hotelCards = trip.hotels.length
     ? trip.hotels.map((hotel) => renderHotelCard(hotel)).join("")
     : `<div class="empty-state compact">No hotel stays added.</div>`;
@@ -1354,7 +1354,7 @@ function renderTripDetail() {
           <p>${formatTripRange(trip)}</p>
         </div>
         <div class="detail-actions">
-          ${destinationLinks}
+          ${tripMapLinks}
           <button class="secondary-button" type="button" data-trip-edit="${escapeAttribute(trip.id)}"><i data-lucide="pencil"></i>Edit</button>
         </div>
       </div>
@@ -1401,7 +1401,6 @@ function renderTripDetail() {
 }
 
 function renderHotelCard(hotel) {
-  const address = hotel.address || hotel.name;
   return `
     <article class="hotel-card">
       <div>
@@ -1411,7 +1410,6 @@ function renderHotelCard(hotel) {
         ${hotel.notes ? `<p>${escapeHTML(hotel.notes)}</p>` : ""}
       </div>
       <div class="detail-actions">
-        ${renderMapLinks(address, "Hotel map")}
         ${hotel.bookingUrl ? `<a class="secondary-button" href="${escapeAttribute(hotel.bookingUrl)}" target="_blank" rel="noreferrer"><i data-lucide="external-link"></i>Booking</a>` : ""}
         <button class="icon-button danger" type="button" data-hotel-delete="${escapeAttribute(hotel.id)}" title="Delete hotel" aria-label="Delete hotel">
           <i data-lucide="trash-2"></i>
@@ -1459,7 +1457,6 @@ function renderTripDayCard(trip, day) {
           ${day.notes ? `<p>${escapeHTML(day.notes)}</p>` : ""}
         </div>
         <div class="detail-actions">
-          ${renderDayMapLinks(day)}
           <button class="icon-button danger" type="button" data-day-delete="${escapeAttribute(day.id)}" title="Delete day" aria-label="Delete day">
             <i data-lucide="trash-2"></i>
           </button>
@@ -1472,7 +1469,6 @@ function renderTripDayCard(trip, day) {
 }
 
 function renderTripStop(day, stop) {
-  const place = stop.address || stop.name;
   return `
     <article class="stop-card ${escapeAttribute(stop.type)}">
       <div>
@@ -1482,7 +1478,6 @@ function renderTripStop(day, stop) {
         ${stop.notes ? `<p>${escapeHTML(stop.notes)}</p>` : ""}
       </div>
       <div class="detail-actions">
-        ${renderMapLinks(place, "Stop map")}
         ${stop.url ? `<a class="secondary-button" href="${escapeAttribute(stop.url)}" target="_blank" rel="noreferrer"><i data-lucide="external-link"></i>Link</a>` : ""}
         <button class="icon-button danger" type="button" data-day-id="${escapeAttribute(day.id)}" data-stop-delete="${escapeAttribute(stop.id)}" title="Delete stop" aria-label="Delete stop">
           <i data-lucide="trash-2"></i>
@@ -4329,15 +4324,41 @@ function renderMapLinks(query, label = "Map") {
   `;
 }
 
-function renderDayMapLinks(day) {
-  const points = day.stops.map((stop) => stop.address || stop.name).filter(Boolean);
+function renderTripMapLinks(trip) {
+  const points = getTripMapPoints(trip);
   if (!points.length) return "";
-  if (points.length === 1) return renderMapLinks(points[0], "Day map");
+  if (points.length === 1) return renderMapLinks(points[0], "Trip map");
 
   return `
-    <a class="secondary-button" href="${escapeAttribute(googleMapsRouteUrl(points))}" target="_blank" rel="noreferrer"><i data-lucide="route"></i>Google route</a>
-    <a class="secondary-button" href="${escapeAttribute(appleMapsUrl(points[0]))}" target="_blank" rel="noreferrer"><i data-lucide="map"></i>Apple first stop</a>
+    <a class="secondary-button" href="${escapeAttribute(googleMapsRouteUrl(points))}" target="_blank" rel="noreferrer"><i data-lucide="route"></i>Google trip</a>
+    <a class="secondary-button" href="${escapeAttribute(appleMapsUrl(points[0]))}" target="_blank" rel="noreferrer"><i data-lucide="map"></i>Apple start</a>
   `;
+}
+
+function getTripMapPoints(trip) {
+  const points = [
+    trip.destination,
+    ...trip.hotels.map((hotel) => hotel.address || hotel.name),
+    ...trip.days.flatMap((day) =>
+      day.stops
+        .filter((stop) => stop.type !== "drive")
+        .map((stop) => stop.address || stop.name),
+    ),
+  ];
+  return dedupeMapPoints(points);
+}
+
+function dedupeMapPoints(points) {
+  const seen = new Set();
+  return points
+    .map((point) => String(point || "").trim())
+    .filter((point) => {
+      if (!point) return false;
+      const key = point.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
 }
 
 function appleMapsUrl(query) {
