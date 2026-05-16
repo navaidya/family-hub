@@ -129,6 +129,11 @@ const elements = {
   financeUploadBtn: document.querySelector("#financeUploadBtn"),
   financeFileInput: document.querySelector("#financeFileInput"),
   financeDropZone: document.querySelector("#financeDropZone"),
+  financeManualForm: document.querySelector("#financeManualForm"),
+  financeManualTitle: document.querySelector("#financeManualTitle"),
+  financeManualAmount: document.querySelector("#financeManualAmount"),
+  financeManualDate: document.querySelector("#financeManualDate"),
+  financeManualNote: document.querySelector("#financeManualNote"),
   financeMonthlyTotal: document.querySelector("#financeMonthlyTotal"),
   financeMonthSummary: document.querySelector("#financeMonthSummary"),
   financeMonthLabel: document.querySelector("#financeMonthLabel"),
@@ -440,6 +445,7 @@ function normalizeExpenses(expenses = []) {
       category: String(expense.category || "Bills").trim(),
       sourceName: String(expense.sourceName || "Uploaded bill").trim(),
       sourceType: String(expense.sourceType || "upload").trim(),
+      note: String(expense.note || "").trim().slice(0, 500),
       textSnippet: String(expense.textSnippet || "").trim().slice(0, 260),
       addedBy: getKnownMemberId(expense.addedBy) || "me",
       createdAt: expense.createdAt || new Date().toISOString(),
@@ -552,6 +558,7 @@ function bindEvents() {
   elements.financeDropZone.addEventListener("dragover", handleFinanceDragOver);
   elements.financeDropZone.addEventListener("dragleave", handleFinanceDragLeave);
   elements.financeDropZone.addEventListener("drop", handleFinanceDrop);
+  elements.financeManualForm.addEventListener("submit", addManualFinanceExpense);
   elements.financePrevMonthBtn.addEventListener("click", () => changeFinanceMonth(-1));
   elements.financeNextMonthBtn.addEventListener("click", () => changeFinanceMonth(1));
   elements.financeThisMonthBtn.addEventListener("click", () => {
@@ -1511,6 +1518,7 @@ function deleteStopFromDay(dayId, stopId) {
 }
 
 function renderFinance() {
+  elements.financeManualDate.value ||= isoToday;
   renderFinanceTotal();
   renderFinanceCalendar();
   renderFinanceExpenses();
@@ -1590,6 +1598,10 @@ function renderFinanceExpenses() {
           <div>
             <strong>${escapeHTML(expense.title)}</strong>
             <p>${formatLongDate(expense.date)} · ${escapeHTML(expense.category)} · ${escapeHTML(expense.sourceName)}</p>
+            <label class="finance-note-label">
+              Note
+              <textarea data-expense-note="${escapeAttribute(expense.id)}" rows="2" maxlength="500" placeholder="What was this expense for?">${escapeHTML(expense.note || "")}</textarea>
+            </label>
             ${expense.textSnippet ? `<p>${escapeHTML(expense.textSnippet)}</p>` : ""}
           </div>
           <div class="finance-expense-actions">
@@ -1605,6 +1617,9 @@ function renderFinanceExpenses() {
 
   elements.financeExpenseList.querySelectorAll("[data-delete-expense]").forEach((button) => {
     button.addEventListener("click", () => deleteFinanceExpense(button.dataset.deleteExpense));
+  });
+  elements.financeExpenseList.querySelectorAll("[data-expense-note]").forEach((textarea) => {
+    textarea.addEventListener("change", updateFinanceExpenseNote);
   });
 
   refreshIcons();
@@ -1625,6 +1640,49 @@ function deleteFinanceExpense(expenseId) {
   saveState();
   renderFinance();
   renderMainTabs();
+}
+
+function addManualFinanceExpense(event) {
+  event.preventDefault();
+  const amount = normalizeExpenseAmount(elements.financeManualAmount.value);
+  const date = elements.financeManualDate.value || isoToday;
+  const title = elements.financeManualTitle.value.trim();
+  if (!title || !amount || !date) return;
+
+  const now = new Date().toISOString();
+  const expense = {
+    id: crypto.randomUUID(),
+    title,
+    merchant: title,
+    date,
+    amount,
+    category: inferFinanceCategory(title),
+    sourceName: "Manual entry",
+    sourceType: "manual",
+    note: elements.financeManualNote.value.trim(),
+    textSnippet: "",
+    addedBy: state.currentMemberId,
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  state.expenses.unshift(expense);
+  state.expenses = normalizeExpenses(state.expenses);
+  visibleFinanceMonth = new Date(parseLocalDate(date).getFullYear(), parseLocalDate(date).getMonth(), 1);
+  saveState();
+  elements.financeManualForm.reset();
+  elements.financeManualDate.value = date;
+  elements.financeProcessStatus.textContent = `Added ${title} for ${formatMoney(amount)}.`;
+  renderFinance();
+  renderMainTabs();
+}
+
+function updateFinanceExpenseNote(event) {
+  const expense = state.expenses.find((item) => item.id === event.currentTarget.dataset.expenseNote);
+  if (!expense) return;
+  expense.note = event.currentTarget.value.trim();
+  expense.updatedAt = new Date().toISOString();
+  saveState();
 }
 
 function handleFinanceDragOver(event) {
@@ -1762,8 +1820,6 @@ function extractExpensesFromBillText(text, file, now) {
     .map((line) => parseFinanceExpenseLine(line, sourceName, sourceType, now))
     .filter(Boolean);
 
-  if (transactionRows.length >= 3) return transactionRows.slice(0, 80);
-
   const date = findFinanceDate(cleanedText) || transactionRows[0]?.date || isoToday;
   const amount = findFinanceTotalAmount(lines) || transactionRows[0]?.amount || findLargestFinanceAmount(cleanedText);
   if (!amount) return [];
@@ -1779,6 +1835,7 @@ function extractExpensesFromBillText(text, file, now) {
       category: inferFinanceCategory(`${sourceName} ${cleanedText}`),
       sourceName,
       sourceType,
+      note: "",
       textSnippet: lines.slice(0, 4).join(" · ").slice(0, 260),
       addedBy: state.currentMemberId,
       createdAt: now,

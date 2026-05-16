@@ -455,6 +455,7 @@ label.import-button {
 
 .finance-summary,
 .finance-drop-zone,
+.finance-manual-panel,
 .finance-calendar-panel,
 .finance-expense-panel {
   min-width: 0;
@@ -465,6 +466,7 @@ label.import-button {
 
 .finance-summary,
 .finance-drop-zone,
+.finance-manual-panel,
 .finance-expense-panel {
   padding: 14px;
 }
@@ -527,6 +529,27 @@ label.import-button {
   grid-column: 1 / -1;
 }
 
+.finance-manual-panel {
+  grid-column: 1 / -1;
+}
+
+.finance-manual-form {
+  display: grid;
+  grid-template-columns: minmax(180px, 1.2fr) minmax(120px, 0.5fr) minmax(140px, 0.55fr);
+  gap: 10px;
+}
+
+.finance-manual-form textarea {
+  grid-column: 1 / -1;
+  min-height: 82px;
+  padding: 10px;
+  resize: vertical;
+}
+
+.finance-manual-form button {
+  justify-self: start;
+}
+
 .finance-calendar .calendar-task.finance {
   color: #135e46;
   background: #dff4ea;
@@ -551,6 +574,39 @@ label.import-button {
   display: block;
   margin-bottom: 4px;
   overflow-wrap: anywhere;
+}
+
+.finance-note-label {
+  display: grid;
+  gap: 6px;
+  margin: 10px 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.finance-note-label textarea,
+.finance-manual-form input,
+.finance-manual-form textarea {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: white;
+  color: var(--ink);
+  font: inherit;
+}
+
+.finance-manual-form input {
+  min-height: 42px;
+  padding: 0 10px;
+}
+
+.finance-note-label textarea {
+  min-height: 68px;
+  padding: 10px;
+  resize: vertical;
+  text-transform: none;
 }
 
 .finance-expense-actions {
@@ -1701,6 +1757,7 @@ label.import-button {
   .detail-facts,
   .form-grid,
   .travel-form,
+  .finance-manual-form,
   .admin-pin-grid,
   .assistant-form,
   .login-grid,
@@ -1764,6 +1821,7 @@ label.import-button {
   }
 
   .travel-form button,
+  .finance-manual-form button,
   .notebook-form .primary-button,
   .assistant-form .primary-button {
     width: 100%;

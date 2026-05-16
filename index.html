@@ -125,8 +125,27 @@
             <i data-lucide="upload-cloud"></i>
             <div>
               <h3>Drop receipts, bills, or screenshots</h3>
-              <p>Images use OCR. PDFs and text files are scanned for dates and amounts. Review extracted rows below.</p>
+              <p>Images use OCR. PDFs and text files are scanned for the bill date and total amount. Review extracted rows below.</p>
             </div>
+          </section>
+
+          <section class="finance-manual-panel">
+            <div class="panel-heading compact">
+              <div>
+                <p class="eyebrow">Manual entry</p>
+                <h2>Add bill</h2>
+              </div>
+            </div>
+            <form class="finance-manual-form" id="financeManualForm">
+              <input id="financeManualTitle" name="title" maxlength="80" placeholder="What was it for? Costco, phone bill, mortgage" required />
+              <input id="financeManualAmount" name="amount" type="number" min="0.01" step="0.01" placeholder="Amount" required />
+              <input id="financeManualDate" name="date" type="date" required />
+              <textarea id="financeManualNote" name="note" rows="3" maxlength="500" placeholder="Note, details, or reason for this expense"></textarea>
+              <button class="primary-button" type="submit">
+                <i data-lucide="plus"></i>
+                Add expense
+              </button>
+            </form>
           </section>
 
           <section class="finance-calendar-panel">
