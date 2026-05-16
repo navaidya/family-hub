@@ -11,6 +11,23 @@ const statuses = [
   { id: "done", label: "Done" },
 ];
 
+const wishCategories = [
+  { id: "experience", label: "Experience" },
+  { id: "dinner", label: "Dinner" },
+  { id: "hike", label: "Hike" },
+  { id: "vacation", label: "Vacation" },
+  { id: "movie", label: "Movie" },
+  { id: "gift", label: "Gift" },
+  { id: "other", label: "Other" },
+];
+
+const wishStatuses = [
+  { id: "wish", label: "Wish" },
+  { id: "discussing", label: "Discussing" },
+  { id: "planned", label: "Planned" },
+  { id: "done", label: "Done" },
+];
+
 const familyMembers = [
   {
     id: "me",
@@ -64,6 +81,7 @@ let state = loadState();
 let activeStatus = "all";
 let selectedTaskId = state.tasks[0]?.id ?? null;
 let selectedTripId = state.trips?.[0]?.id ?? null;
+let selectedWishId = state.wishes?.[0]?.id ?? null;
 let visibleMonth = new Date(today.getFullYear(), today.getMonth(), 1);
 let pendingLoginMemberId = state.currentMemberId;
 let cloudState = createCloudState();
@@ -76,6 +94,9 @@ const elements = {
   currentProfileBtn: document.querySelector("#currentProfileBtn"),
   loginBtn: document.querySelector("#loginBtn"),
   memberStrip: document.querySelector("#memberStrip"),
+  newWishBtn: document.querySelector("#newWishBtn"),
+  wishList: document.querySelector("#wishList"),
+  wishDetail: document.querySelector("#wishDetail"),
   newTripBtn: document.querySelector("#newTripBtn"),
   tripList: document.querySelector("#tripList"),
   tripDetail: document.querySelector("#tripDetail"),
@@ -97,6 +118,11 @@ const elements = {
   tripDialogTitle: document.querySelector("#tripDialogTitle"),
   closeTripDialogBtn: document.querySelector("#closeTripDialogBtn"),
   deleteTripBtn: document.querySelector("#deleteTripBtn"),
+  wishDialog: document.querySelector("#wishDialog"),
+  wishForm: document.querySelector("#wishForm"),
+  wishDialogTitle: document.querySelector("#wishDialogTitle"),
+  closeWishDialogBtn: document.querySelector("#closeWishDialogBtn"),
+  deleteWishBtn: document.querySelector("#deleteWishBtn"),
   exportBtn: document.querySelector("#exportBtn"),
   importInput: document.querySelector("#importInput"),
   emailDigestBtn: document.querySelector("#emailDigestBtn"),
@@ -164,6 +190,16 @@ const tripForm = {
   notes: document.querySelector("#tripNotes"),
 };
 
+const wishForm = {
+  id: document.querySelector("#wishId"),
+  title: document.querySelector("#wishTitle"),
+  owner: document.querySelector("#wishOwner"),
+  category: document.querySelector("#wishCategory"),
+  status: document.querySelector("#wishStatus"),
+  targetDate: document.querySelector("#wishTargetDate"),
+  details: document.querySelector("#wishDetails"),
+};
+
 render();
 bindEvents();
 registerServiceWorker();
@@ -180,6 +216,7 @@ function loadState() {
         tasks: normalizeTasks(parsed.tasks?.length ? parsed.tasks : seedTasks()),
         notes: normalizeNotes(parsed.notes),
         trips: normalizeTrips(parsed.trips),
+        wishes: normalizeWishes(parsed.wishes),
         currentMemberId: localStorage.getItem(LOCAL_PROFILE_KEY) || parsed.currentMemberId || "me",
       };
     } catch (error) {
@@ -192,6 +229,7 @@ function loadState() {
     tasks: normalizeTasks(seedTasks()),
     notes: normalizeNotes(),
     trips: normalizeTrips(),
+    wishes: normalizeWishes(),
     currentMemberId: localStorage.getItem(LOCAL_PROFILE_KEY) || "me",
   };
 }
@@ -302,6 +340,49 @@ function normalizeTripStops(stops = []) {
   }));
 }
 
+function normalizeWishes(wishes = []) {
+  if (!Array.isArray(wishes)) return [];
+
+  return wishes
+    .filter((wish) => wish && typeof wish === "object")
+    .map((wish) => {
+      const details = String(wish.details || "").trim();
+      const category = wishCategories.some((item) => item.id === wish.category) ? wish.category : "experience";
+      const status = wishStatuses.some((item) => item.id === wish.status) ? wish.status : "wish";
+      return {
+        id: wish.id || crypto.randomUUID(),
+        title: String(wish.title || deriveWishTitle(details, category)).trim(),
+        owner: getKnownMemberId(wish.owner) || "me",
+        category,
+        status,
+        targetDate: wish.targetDate || "",
+        details,
+        comments: normalizeWishComments(wish.comments),
+        createdAt: wish.createdAt || new Date().toISOString(),
+        updatedAt: wish.updatedAt || wish.createdAt || new Date().toISOString(),
+      };
+    })
+    .filter((wish) => wish.title || wish.details)
+    .sort((a, b) => {
+      if (a.status === "done" && b.status !== "done") return 1;
+      if (a.status !== "done" && b.status === "done") return -1;
+      return b.updatedAt.localeCompare(a.updatedAt);
+    });
+}
+
+function normalizeWishComments(comments = []) {
+  if (!Array.isArray(comments)) return [];
+  return comments
+    .filter((comment) => comment && typeof comment.text === "string")
+    .map((comment) => ({
+      id: comment.id || crypto.randomUUID(),
+      author: getKnownMemberId(comment.author) || "me",
+      createdAt: comment.createdAt || new Date().toISOString(),
+      text: comment.text.trim(),
+    }))
+    .filter((comment) => comment.text);
+}
+
 function normalizePin(pin) {
   return String(pin || "").trim();
 }
@@ -371,6 +452,7 @@ function bindEvents() {
   elements.currentProfileBtn.addEventListener("click", openProfileDialog);
   elements.loginBtn.addEventListener("click", () => openLoginDialog());
   elements.newTaskBtn.addEventListener("click", () => openTaskDialog());
+  elements.newWishBtn.addEventListener("click", () => openWishDialog());
   elements.newTripBtn.addEventListener("click", () => openTripDialog());
   elements.closeDialogBtn.addEventListener("click", () => closeTaskDialog());
   elements.taskForm.addEventListener("submit", saveTaskFromForm);
@@ -378,6 +460,9 @@ function bindEvents() {
   elements.closeTripDialogBtn.addEventListener("click", closeTripDialog);
   elements.tripForm.addEventListener("submit", saveTripFromForm);
   elements.deleteTripBtn.addEventListener("click", deleteCurrentTrip);
+  elements.closeWishDialogBtn.addEventListener("click", closeWishDialog);
+  elements.wishForm.addEventListener("submit", saveWishFromForm);
+  elements.deleteWishBtn.addEventListener("click", deleteCurrentWish);
   elements.searchInput.addEventListener("input", renderTasks);
   elements.exportBtn.addEventListener("click", exportState);
   elements.importInput.addEventListener("change", importState);
@@ -396,6 +481,10 @@ function bindEvents() {
 
   elements.tripDialog.addEventListener("click", (event) => {
     if (event.target === elements.tripDialog) closeTripDialog();
+  });
+
+  elements.wishDialog.addEventListener("click", (event) => {
+    if (event.target === elements.wishDialog) closeWishDialog();
   });
 
   elements.loginForm.addEventListener("submit", loginAsSelectedMember);
@@ -548,6 +637,7 @@ function applyRemoteFamilyData(data = {}) {
     tasks: normalizeTasks(data.tasks?.length ? data.tasks : []),
     notes: normalizeNotes(data.notes),
     trips: normalizeTrips(data.trips),
+    wishes: normalizeWishes(data.wishes),
     currentMemberId: localStorage.getItem(LOCAL_PROFILE_KEY) || state.currentMemberId || "me",
   };
 
@@ -561,6 +651,10 @@ function applyRemoteFamilyData(data = {}) {
 
   if (!state.trips.some((trip) => trip.id === selectedTripId)) {
     selectedTripId = state.trips[0]?.id ?? null;
+  }
+
+  if (!state.wishes.some((wish) => wish.id === selectedWishId)) {
+    selectedWishId = state.wishes[0]?.id ?? null;
   }
 
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
@@ -584,6 +678,7 @@ function saveCloudState(force = false) {
     tasks: state.tasks,
     notes: state.notes,
     trips: state.trips,
+    wishes: state.wishes,
     updatedBy: cloudState.user.email || cloudState.user.uid,
     updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
   };
@@ -725,6 +820,7 @@ function render() {
   renderCloudStatus();
   renderCurrentProfile();
   renderMemberStrip();
+  renderWishes();
   renderTrips();
   renderStatusTabs();
   populateFormOptions();
@@ -760,12 +856,13 @@ function renderMemberStrip() {
     .map((member) => {
       const assigned = state.tasks.filter((task) => task.assignee === member.id && task.status !== "done").length;
       const requested = state.tasks.filter((task) => task.requester === member.id && task.status !== "done").length;
+      const wishes = state.wishes.filter((wish) => wish.owner === member.id && wish.status !== "done").length;
       return `
         <button class="member-tile ${member.id === state.currentMemberId ? "current" : ""}" type="button" data-login-member="${member.id}">
           <div class="avatar" style="background:${member.color}">${initials(member.name)}</div>
           <div>
             <strong>${escapeHTML(member.name)}</strong>
-            <span>${assigned} assigned · ${requested} asked</span>
+            <span>${assigned} assigned · ${requested} asked · ${wishes} wishes</span>
           </div>
         </button>
       `;
@@ -775,6 +872,120 @@ function renderMemberStrip() {
   elements.memberStrip.querySelectorAll("[data-login-member]").forEach((button) => {
     button.addEventListener("click", () => openLoginDialog(button.dataset.loginMember));
   });
+}
+
+function renderWishes() {
+  if (!state.wishes.length) {
+    elements.wishList.innerHTML = `<div class="empty-state compact">No wishes yet.</div>`;
+    elements.wishDetail.innerHTML = `
+      <div class="empty-detail compact-detail">
+        <i data-lucide="sparkles"></i>
+        <h2>Share a wish</h2>
+        <p>Add dinners, hikes, movies, vacations, gifts, or anything someone wants the family to understand.</p>
+      </div>
+    `;
+    refreshIcons();
+    return;
+  }
+
+  if (!getSelectedWish()) {
+    selectedWishId = state.wishes[0].id;
+  }
+
+  elements.wishList.innerHTML = getSortedWishes()
+    .map((wish) => {
+      const owner = getMember(wish.owner);
+      const targetDate = wish.targetDate ? formatShortDate(wish.targetDate) : "No date";
+      return `
+        <button class="wish-row ${wish.id === selectedWishId ? "selected" : ""} ${wish.status === "done" ? "done" : ""}" type="button" data-wish-id="${escapeAttribute(wish.id)}">
+          <span class="avatar mini" style="background:${owner?.color || "var(--teal)"}">${initials(owner?.name || "F")}</span>
+          <span>
+            <strong>${escapeHTML(wish.title)}</strong>
+            <span>${escapeHTML(memberName(wish.owner))} · ${wishCategoryLabel(wish.category)} · ${targetDate}</span>
+          </span>
+        </button>
+      `;
+    })
+    .join("");
+
+  elements.wishList.querySelectorAll("[data-wish-id]").forEach((button) => {
+    button.addEventListener("click", () => {
+      selectedWishId = button.dataset.wishId;
+      renderWishes();
+      refreshIcons();
+    });
+  });
+
+  renderWishDetail();
+}
+
+function renderWishDetail() {
+  const wish = getSelectedWish();
+  if (!wish) return;
+
+  const comments = wish.comments.length
+    ? wish.comments
+        .map(
+          (comment) => `
+            <article class="comment wish-comment">
+              <div class="comment-meta">${escapeHTML(memberName(comment.author))} · ${formatDateTime(comment.createdAt)}</div>
+              <p>${escapeHTML(comment.text)}</p>
+            </article>
+          `,
+        )
+        .join("")
+    : `<div class="empty-state compact">No discussion yet.</div>`;
+
+  elements.wishDetail.innerHTML = `
+    <div class="wish-detail-stack">
+      <div class="detail-top">
+        <div>
+          <p class="eyebrow">${wishCategoryLabel(wish.category)}</p>
+          <h2 class="detail-title">${escapeHTML(wish.title)}</h2>
+        </div>
+        <div class="detail-actions">
+          <button class="secondary-button" type="button" data-wish-edit><i data-lucide="pencil"></i>Edit</button>
+          <button class="chip-button" type="button" data-wish-task><i data-lucide="list-plus"></i>Make task</button>
+          ${wish.status !== "done" ? `<button class="secondary-button" type="button" data-wish-done><i data-lucide="check"></i>Done</button>` : ""}
+        </div>
+      </div>
+
+      <section class="detail-facts">
+        <div class="fact"><span>For</span><strong>${escapeHTML(memberName(wish.owner))}</strong></div>
+        <div class="fact"><span>Status</span><strong>${wishStatusLabel(wish.status)}</strong></div>
+        <div class="fact"><span>Target date</span><strong>${wish.targetDate ? formatLongDate(wish.targetDate) : "Open"}</strong></div>
+        <div class="fact"><span>Discussion</span><strong>${wish.comments.length} note${wish.comments.length === 1 ? "" : "s"}</strong></div>
+      </section>
+
+      <section class="requirements">
+        <h3>Wish details</h3>
+        <p class="task-description">${escapeHTML(wish.details || "No details added.")}</p>
+      </section>
+
+      <section class="conversation">
+        <h3>Discussion</h3>
+        ${comments}
+        <form class="comment-form" data-wish-comment-form>
+          <select aria-label="Comment author" name="author">
+            ${state.members
+              .map(
+                (member) =>
+                  `<option value="${member.id}" ${member.id === state.currentMemberId ? "selected" : ""}>${escapeHTML(member.name)}</option>`,
+              )
+              .join("")}
+          </select>
+          <input aria-label="Comment" name="text" placeholder="Ask a question or add detail" required maxlength="260" />
+          <button class="primary-button" type="submit"><i data-lucide="send"></i>Send</button>
+        </form>
+      </section>
+    </div>
+  `;
+
+  elements.wishDetail.querySelector("[data-wish-edit]").addEventListener("click", () => openWishDialog(wish));
+  elements.wishDetail.querySelector("[data-wish-task]").addEventListener("click", () => makeTaskFromWish(wish.id));
+  elements.wishDetail.querySelector("[data-wish-comment-form]").addEventListener("submit", addWishComment);
+  elements.wishDetail.querySelector("[data-wish-done]")?.addEventListener("click", () => markWishDone(wish.id));
+  refreshIcons();
 }
 
 function renderTrips() {
@@ -1279,6 +1490,14 @@ function populateFormOptions() {
 
   form.requester.innerHTML = memberOptions;
   form.assignee.innerHTML = `<option value="">Unassigned</option>${memberOptions}`;
+
+  wishForm.owner.innerHTML = memberOptions;
+  wishForm.category.innerHTML = wishCategories
+    .map((category) => `<option value="${category.id}">${category.label}</option>`)
+    .join("");
+  wishForm.status.innerHTML = wishStatuses
+    .map((status) => `<option value="${status.id}">${status.label}</option>`)
+    .join("");
 }
 
 function renderTasks() {
@@ -1433,6 +1652,7 @@ function renderCalendar() {
         const iso = toISODate(date);
         const tasks = state.tasks.filter((task) => task.dueDate === iso);
         const tripEvents = getTripEventsForDate(iso);
+        const wishEvents = getWishEventsForDate(iso);
         const outside = date.getMonth() !== visibleMonth.getMonth();
         const isToday = iso === isoToday;
         return `
@@ -1452,6 +1672,15 @@ function renderCalendar() {
                 .map(
                   (event) => `
                     <button class="calendar-task trip" type="button" data-calendar-trip="${event.tripId}" title="${escapeAttribute(event.title)}">
+                      ${escapeHTML(event.title)}
+                    </button>
+                  `,
+                )
+                .join("")}
+              ${wishEvents
+                .map(
+                  (event) => `
+                    <button class="calendar-task wish" type="button" data-calendar-wish="${event.wishId}" title="${escapeAttribute(event.title)}">
                       ${escapeHTML(event.title)}
                     </button>
                   `,
@@ -1478,6 +1707,14 @@ function renderCalendar() {
       selectedTripId = button.dataset.calendarTrip;
       renderTrips();
       elements.tripDetail.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  });
+
+  elements.calendarGrid.querySelectorAll("[data-calendar-wish]").forEach((button) => {
+    button.addEventListener("click", () => {
+      selectedWishId = button.dataset.calendarWish;
+      renderWishes();
+      elements.wishDetail.scrollIntoView({ behavior: "smooth", block: "start" });
     });
   });
 }
@@ -1631,6 +1868,7 @@ function renderAssistantSuggestions() {
     "What is due this week?",
     "Who has overdue tasks?",
     "Show unassigned tasks",
+    "Show family wishlist",
     "Create tasks: Dentist appointment tomorrow",
   ];
 
@@ -1678,7 +1916,7 @@ function answerFamilyQuestion(question) {
   const activeTasks = tasks.filter((task) => task.status !== "done");
 
   if (mentionsHelp(normalized)) {
-    return "I can answer things like: what is due today, what is due this week, who owns a task, what is overdue, what is unassigned, show my notes, create a task from a note, or summarize a family member's tasks.";
+    return "I can answer things like: what is due today, what is due this week, who owns a task, what is overdue, what is unassigned, show family wishes, show my notes, create a task from a note, or summarize a family member's tasks.";
   }
 
   if (mentionsTaskCreationFromNote(normalized)) {
@@ -1688,6 +1926,16 @@ function answerFamilyQuestion(question) {
 
   if (mentionsRoughTaskCreation(question, normalized)) {
     return createTasksFromRoughList(question);
+  }
+
+  if (mentionsWish(normalized)) {
+    const wishes = getSortedWishes().filter((wish) => wish.status !== "done");
+    if (person) {
+      return formatWishAnswer(`${person.name}'s wishes`, wishes.filter((wish) => wish.owner === person.id));
+    }
+
+    const matchingWishes = searchWishes(normalized, wishes);
+    return formatWishAnswer("Family Wishlist", matchingWishes.length ? matchingWishes : wishes);
   }
 
   if (mentionsNotebook(normalized)) {
@@ -1780,6 +2028,29 @@ function searchNotes(text, notes) {
   return matches.length ? matches : notes;
 }
 
+function searchWishes(text, wishes) {
+  const terms = text
+    .replace(/[?.,]/g, " ")
+    .split(/\s+/)
+    .filter((term) => term.length > 2 && !assistantStopWords().has(term));
+
+  if (!terms.length) return wishes;
+
+  return wishes.filter((wish) => {
+    const haystack = [
+      wish.title,
+      wish.details,
+      wishCategoryLabel(wish.category),
+      wishStatusLabel(wish.status),
+      memberName(wish.owner),
+      wish.targetDate ? formatLongDate(wish.targetDate) : "",
+    ]
+      .join(" ")
+      .toLowerCase();
+    return terms.some((term) => haystack.includes(term));
+  });
+}
+
 function formatNotebookAnswer(member, notes) {
   if (!notes.length) return `${member.name}'s notebook has no notes yet.`;
 
@@ -1787,6 +2058,21 @@ function formatNotebookAnswer(member, notes) {
     .slice(0, 5)
     .map((note) => `- ${note.text} (${formatDateTime(note.updatedAt)})`)
     .join("\n")}`;
+}
+
+function formatWishAnswer(title, wishes) {
+  if (!wishes.length) return `${title}: none found.`;
+  return `${title}: ${wishes.length}\n\n${formatWishLines(wishes)}`;
+}
+
+function formatWishLines(wishes) {
+  return wishes
+    .slice(0, 8)
+    .map((wish) => {
+      const target = wish.targetDate ? `, target ${formatLongDate(wish.targetDate)}` : "";
+      return `- ${wish.title}: ${memberName(wish.owner)}, ${wishCategoryLabel(wish.category)}, ${wishStatusLabel(wish.status)}${target}`;
+    })
+    .join("\n");
 }
 
 function createTaskFromNotebookQuestion(text, member) {
@@ -2118,6 +2404,10 @@ function mentionsNotebook(text) {
   return text.includes("note") || text.includes("notes") || text.includes("notebook");
 }
 
+function mentionsWish(text) {
+  return text.includes("wish") || text.includes("wishlist") || text.includes("bucket") || text.includes("dream");
+}
+
 function mentionsTaskCreationFromNote(text) {
   const wantsTask = text.includes("task") || text.includes("todo") || text.includes("to do");
   const wantsNote = mentionsNotebook(text);
@@ -2193,6 +2483,11 @@ function assistantStopWords() {
     "note",
     "notes",
     "notebook",
+    "wish",
+    "wishes",
+    "wishlist",
+    "bucket",
+    "dream",
     "summary",
     "summarize",
   ]);
@@ -2241,6 +2536,75 @@ function openTripDialog(trip = null) {
 function closeTripDialog() {
   elements.tripDialog.close();
   elements.tripForm.reset();
+}
+
+function openWishDialog(wish = null) {
+  elements.wishDialogTitle.textContent = wish ? "Edit wish" : "New wish";
+  elements.deleteWishBtn.style.visibility = wish ? "visible" : "hidden";
+
+  wishForm.id.value = wish?.id ?? "";
+  wishForm.title.value = wish?.title ?? "";
+  wishForm.owner.value = wish?.owner ?? state.currentMemberId;
+  wishForm.category.value = wish?.category ?? "experience";
+  wishForm.status.value = wish?.status ?? "wish";
+  wishForm.targetDate.value = wish?.targetDate ?? "";
+  wishForm.details.value = wish?.details ?? "";
+
+  elements.wishDialog.showModal();
+  wishForm.details.focus();
+  refreshIcons();
+}
+
+function closeWishDialog() {
+  elements.wishDialog.close();
+  elements.wishForm.reset();
+}
+
+function saveWishFromForm(event) {
+  event.preventDefault();
+  const id = wishForm.id.value || crypto.randomUUID();
+  const existing = state.wishes.find((wish) => wish.id === id);
+  const details = wishForm.details.value.trim();
+  const category = wishForm.category.value;
+  const now = new Date().toISOString();
+  const wish = {
+    id,
+    title: (wishForm.title.value.trim() || deriveWishTitle(details, category)).slice(0, 90),
+    owner: wishForm.owner.value,
+    category,
+    status: wishForm.status.value,
+    targetDate: wishForm.targetDate.value,
+    details,
+    comments: existing?.comments ?? [],
+    createdAt: existing?.createdAt ?? now,
+    updatedAt: now,
+  };
+
+  if (existing) {
+    state.wishes = state.wishes.map((item) => (item.id === id ? wish : item));
+  } else {
+    state.wishes.unshift(wish);
+  }
+
+  selectedWishId = id;
+  saveState();
+  closeWishDialog();
+  render();
+}
+
+function deleteCurrentWish() {
+  const id = wishForm.id.value;
+  if (!id) return;
+  const wish = state.wishes.find((item) => item.id === id);
+  if (!wish) return;
+  const confirmed = window.confirm(`Delete "${wish.title}"?`);
+  if (!confirmed) return;
+
+  state.wishes = state.wishes.filter((item) => item.id !== id);
+  selectedWishId = state.wishes[0]?.id ?? null;
+  saveState();
+  closeWishDialog();
+  render();
 }
 
 function saveTripFromForm(event) {
@@ -2357,6 +2721,72 @@ function addComment(event) {
   renderDetail();
 }
 
+function addWishComment(event) {
+  event.preventDefault();
+  const wish = getSelectedWish();
+  if (!wish) return;
+
+  const data = new FormData(event.currentTarget);
+  const text = String(data.get("text") || "").trim();
+  if (!text) return;
+
+  wish.comments.push({
+    id: crypto.randomUUID(),
+    author: String(data.get("author")),
+    createdAt: new Date().toISOString(),
+    text,
+  });
+  wish.status = wish.status === "wish" ? "discussing" : wish.status;
+  wish.updatedAt = new Date().toISOString();
+  saveState();
+  renderWishes();
+}
+
+function makeTaskFromWish(wishId) {
+  const wish = state.wishes.find((item) => item.id === wishId);
+  if (!wish) return;
+
+  const now = new Date().toISOString();
+  const task = {
+    id: crypto.randomUUID(),
+    title: wish.title,
+    type: wish.category === "gift" ? "ask" : "todo",
+    status: "discussion",
+    requester: wish.owner,
+    assignee: "",
+    dueDate: wish.targetDate || addDays(isoToday, 7),
+    priority: "normal",
+    description: `Created from Family Wishlist.\n\nCategory: ${wishCategoryLabel(wish.category)}\nWish details:\n${wish.details || "No details added."}`,
+    comments: [
+      {
+        id: crypto.randomUUID(),
+        author: state.currentMemberId,
+        createdAt: now,
+        text: "Created from a Family Wishlist item.",
+      },
+    ],
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  state.tasks.unshift(task);
+  wish.status = "planned";
+  wish.updatedAt = now;
+  selectedTaskId = task.id;
+  saveState();
+  render();
+  document.querySelector(".dashboard-grid")?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function markWishDone(wishId) {
+  const wish = state.wishes.find((item) => item.id === wishId);
+  if (!wish) return;
+  wish.status = "done";
+  wish.updatedAt = new Date().toISOString();
+  saveState();
+  render();
+}
+
 function advanceTask(id) {
   const task = state.tasks.find((item) => item.id === id);
   if (!task) return;
@@ -2450,10 +2880,12 @@ function importState(event) {
         tasks: normalizeTasks(imported.tasks),
         notes: normalizeNotes(imported.notes),
         trips: normalizeTrips(imported.trips),
+        wishes: normalizeWishes(imported.wishes),
         currentMemberId: imported.currentMemberId || "me",
       };
       selectedTaskId = state.tasks[0]?.id ?? null;
       selectedTripId = state.trips[0]?.id ?? null;
+      selectedWishId = state.wishes[0]?.id ?? null;
       saveState();
       render();
     } catch (error) {
@@ -2479,6 +2911,10 @@ function getSelectedTrip() {
   return state.trips.find((trip) => trip.id === selectedTripId) ?? null;
 }
 
+function getSelectedWish() {
+  return state.wishes.find((wish) => wish.id === selectedWishId) ?? null;
+}
+
 function getTripEventsForDate(dateString) {
   return state.trips.flatMap((trip) => {
     const events = [];
@@ -2495,6 +2931,15 @@ function getTripEventsForDate(dateString) {
       });
     return events;
   });
+}
+
+function getWishEventsForDate(dateString) {
+  return state.wishes
+    .filter((wish) => wish.targetDate === dateString && wish.status !== "done")
+    .map((wish) => ({
+      wishId: wish.id,
+      title: `Wish: ${wish.title}`,
+    }));
 }
 
 function getNotebookNotes(memberId = state.currentMemberId) {
@@ -2515,6 +2960,17 @@ function getSortedTasks() {
     if (a.status !== "done" && b.status === "done") return -1;
     const dateDiff = a.dueDate.localeCompare(b.dueDate);
     if (dateDiff !== 0) return dateDiff;
+    return b.updatedAt.localeCompare(a.updatedAt);
+  });
+}
+
+function getSortedWishes() {
+  return [...state.wishes].sort((a, b) => {
+    if (a.status === "done" && b.status !== "done") return 1;
+    if (a.status !== "done" && b.status === "done") return -1;
+    if (a.targetDate && b.targetDate && a.targetDate !== b.targetDate) return a.targetDate.localeCompare(b.targetDate);
+    if (a.targetDate && !b.targetDate) return -1;
+    if (!a.targetDate && b.targetDate) return 1;
     return b.updatedAt.localeCompare(a.updatedAt);
   });
 }
@@ -2637,6 +3093,10 @@ function getMember(id) {
   return state.members.find((member) => member.id === id) ?? null;
 }
 
+function getKnownMemberId(id) {
+  return familyMembers.some((member) => member.id === id) ? id : "";
+}
+
 function memberName(id) {
   return getMember(id)?.name ?? "Unassigned";
 }
@@ -2656,6 +3116,30 @@ function taskTypeLabel(type) {
 
 function statusLabel(status) {
   return statuses.find((item) => item.id === status)?.label ?? status;
+}
+
+function wishCategoryLabel(category) {
+  return wishCategories.find((item) => item.id === category)?.label ?? "Wish";
+}
+
+function wishStatusLabel(status) {
+  return wishStatuses.find((item) => item.id === status)?.label ?? "Wish";
+}
+
+function deriveWishTitle(details, category = "experience") {
+  const firstLine =
+    String(details || "")
+      .split("\n")
+      .map((line) => line.trim())
+      .find(Boolean) || "";
+  const cleaned = firstLine
+    .replace(/^[-*\d.)\s]+/, "")
+    .replace(/^(i\s+wish|wish|want|i\s+want|i\s+would\s+like|would\s+like)\s*:?\s*/i, "")
+    .trim();
+  if (cleaned) {
+    return cleaned.length > 72 ? `${cleaned.slice(0, 69).trim()}...` : cleaned;
+  }
+  return `${wishCategoryLabel(category)} wish`;
 }
 
 function nextStatusLabel(status) {

@@ -315,6 +315,12 @@ label.import-button {
   font-weight: 900;
 }
 
+.avatar.mini {
+  width: 34px;
+  height: 34px;
+  font-size: 0.75rem;
+}
+
 .member-tile strong,
 .task-title,
 .detail-title,
@@ -348,6 +354,7 @@ label.import-button {
 }
 
 .task-panel,
+.wishlist-panel,
 .travel-panel,
 .detail-panel,
 .calendar-panel,
@@ -362,6 +369,7 @@ label.import-button {
 }
 
 .task-panel,
+.wishlist-panel,
 .travel-panel,
 .detail-panel,
 .reminder-panel,
@@ -378,6 +386,54 @@ label.import-button {
   display: grid;
   grid-template-columns: minmax(220px, 0.34fr) minmax(0, 1fr);
   gap: 14px;
+}
+
+.wishlist-grid {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.34fr) minmax(0, 1fr);
+  gap: 14px;
+}
+
+.wish-list,
+.wish-detail-stack {
+  display: grid;
+  gap: 10px;
+}
+
+.wish-row {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-left: 5px solid var(--indigo);
+  border-radius: 8px;
+  color: var(--ink);
+  background: var(--surface);
+  text-align: left;
+}
+
+.wish-row.selected {
+  border-color: var(--teal);
+  border-left-color: var(--teal);
+  background: var(--surface-soft);
+}
+
+.wish-row.done {
+  border-left-color: var(--green);
+  opacity: 0.78;
+}
+
+.wish-row strong {
+  display: block;
+  margin-bottom: 4px;
+  overflow-wrap: anywhere;
+}
+
+.wish-row span span {
+  color: var(--muted);
+  font-size: 0.9rem;
 }
 
 .trip-list,
@@ -778,6 +834,11 @@ label.import-button {
   background: #f4f6ff;
 }
 
+.comment.wish-comment {
+  border-left-color: var(--teal);
+  background: #eef8f5;
+}
+
 .comment p {
   margin: 5px 0 0;
   overflow-wrap: anywhere;
@@ -1023,6 +1084,11 @@ label.import-button {
   background: #dff4ea;
 }
 
+.calendar-task.wish {
+  color: #38417e;
+  background: #e5e8ff;
+}
+
 .calendar-task.done {
   text-decoration: line-through;
   opacity: 0.68;
@@ -1226,7 +1292,8 @@ label.import-button {
 }
 
 #deleteTaskBtn,
-#deleteTripBtn {
+#deleteTripBtn,
+#deleteWishBtn {
   margin-right: auto;
   color: var(--red);
 }
@@ -1234,7 +1301,8 @@ label.import-button {
 @media (max-width: 1080px) {
   .dashboard-grid,
   .lower-grid,
-  .travel-grid {
+  .travel-grid,
+  .wishlist-grid {
     grid-template-columns: 1fr;
   }
 

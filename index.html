@@ -67,6 +67,23 @@
     <main class="app-shell">
       <section class="member-strip" id="memberStrip" aria-label="Family members"></section>
 
+      <section class="wishlist-panel" aria-label="Family wishlist">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">Dreams and wishes</p>
+            <h2>Family Wishlist</h2>
+          </div>
+          <button class="primary-button" id="newWishBtn" type="button">
+            <i data-lucide="sparkles"></i>
+            New wish
+          </button>
+        </div>
+        <div class="wishlist-grid">
+          <div class="wish-list" id="wishList"></div>
+          <div class="wish-detail" id="wishDetail"></div>
+        </div>
+      </section>
+
       <section class="travel-panel" aria-label="Family vacation plans">
         <div class="panel-heading">
           <div>
@@ -257,6 +274,65 @@
           <button class="primary-button" type="submit">
             <i data-lucide="save"></i>
             Save
+          </button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="wishDialog" class="task-dialog">
+      <form id="wishForm" method="dialog">
+        <div class="dialog-heading">
+          <div>
+            <p class="eyebrow">Family Wishlist</p>
+            <h2 id="wishDialogTitle">New wish</h2>
+          </div>
+          <button class="icon-button" id="closeWishDialogBtn" value="cancel" type="button" title="Close" aria-label="Close">
+            <i data-lucide="x">×</i>
+          </button>
+        </div>
+
+        <input id="wishId" type="hidden" />
+
+        <label>
+          Title
+          <input id="wishTitle" maxlength="90" placeholder="Leave blank to suggest from details" />
+        </label>
+
+        <div class="form-grid">
+          <label>
+            For
+            <select id="wishOwner" name="owner"></select>
+          </label>
+
+          <label>
+            Category
+            <select id="wishCategory" name="category"></select>
+          </label>
+
+          <label>
+            Status
+            <select id="wishStatus" name="status"></select>
+          </label>
+
+          <label>
+            Target date
+            <input id="wishTargetDate" name="targetDate" type="date" />
+          </label>
+        </div>
+
+        <label>
+          Details
+          <textarea id="wishDetails" name="details" rows="5" required placeholder="What do you want, why, budget, location, links, timing, or anything the family should understand"></textarea>
+        </label>
+
+        <div class="dialog-actions">
+          <button class="secondary-button" id="deleteWishBtn" type="button">
+            <i data-lucide="trash-2"></i>
+            Delete
+          </button>
+          <button class="primary-button" type="submit">
+            <i data-lucide="save"></i>
+            Save wish
           </button>
         </div>
       </form>
