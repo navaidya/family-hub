@@ -1731,11 +1731,30 @@ function renderDetail() {
       </div>
     </div>
 
-    <section class="detail-facts">
-      <div class="fact"><span>Status</span><strong>${statusLabel(task.status)}</strong></div>
-      <div class="fact"><span>Due</span><strong>${formatLongDate(task.dueDate)}</strong></div>
-      <div class="fact"><span>Requested by</span><strong>${escapeHTML(memberName(task.requester))}</strong></div>
-      <div class="fact"><span>Assigned to</span><strong>${escapeHTML(task.assignee ? memberName(task.assignee) : "Unassigned")}</strong></div>
+    <section class="detail-facts editable-facts">
+      <label class="fact inline-fact">
+        <span>Status</span>
+        <select class="inline-control" data-task-inline="status" aria-label="Task status">
+          ${renderStatusOptions(task.status)}
+        </select>
+      </label>
+      <label class="fact inline-fact">
+        <span>Due</span>
+        <input class="inline-control" data-task-inline="dueDate" aria-label="Task due date" type="date" value="${escapeAttribute(task.dueDate)}" />
+      </label>
+      <label class="fact inline-fact">
+        <span>Requested by</span>
+        <select class="inline-control" data-task-inline="requester" aria-label="Requested by">
+          ${renderMemberOptions(task.requester)}
+        </select>
+      </label>
+      <label class="fact inline-fact">
+        <span>Assigned to</span>
+        <select class="inline-control" data-task-inline="assignee" aria-label="Assigned to">
+          <option value="" ${task.assignee ? "" : "selected"}>Unassigned</option>
+          ${renderMemberOptions(task.assignee)}
+        </select>
+      </label>
     </section>
 
     <section class="requirements">
@@ -1765,7 +1784,46 @@ function renderDetail() {
   elements.taskDetail.querySelector('[data-action="email"]').addEventListener("click", () => sendTaskEmail(task));
   elements.taskDetail.querySelector('[data-action="advance"]').addEventListener("click", () => advanceTask(task.id));
   elements.taskDetail.querySelector("[data-comment-form]").addEventListener("submit", addComment);
+  elements.taskDetail.querySelectorAll("[data-task-inline]").forEach((control) => {
+    control.addEventListener("change", updateTaskInlineField);
+  });
   refreshIcons();
+}
+
+function renderStatusOptions(selectedStatus) {
+  return statuses
+    .filter((status) => status.id !== "all")
+    .map((status) => `<option value="${status.id}" ${status.id === selectedStatus ? "selected" : ""}>${status.label}</option>`)
+    .join("");
+}
+
+function renderMemberOptions(selectedMemberId) {
+  return state.members
+    .map((member) => `<option value="${member.id}" ${member.id === selectedMemberId ? "selected" : ""}>${escapeHTML(member.name)}</option>`)
+    .join("");
+}
+
+function updateTaskInlineField(event) {
+  const task = getSelectedTask();
+  if (!task) return;
+
+  const field = event.currentTarget.dataset.taskInline;
+  const value = event.currentTarget.value;
+  if (!["status", "dueDate", "requester", "assignee"].includes(field)) return;
+  if (field === "dueDate" && !value) {
+    event.currentTarget.value = task.dueDate;
+    return;
+  }
+  if (task[field] === value) return;
+
+  task[field] = value;
+  task.updatedAt = new Date().toISOString();
+  saveState();
+  renderStatusTabs();
+  renderTasks();
+  renderDetail();
+  renderCalendar();
+  renderReminders();
 }
 
 function renderCalendar() {

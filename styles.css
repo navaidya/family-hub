@@ -873,6 +873,27 @@ label.import-button {
   overflow-wrap: anywhere;
 }
 
+.inline-fact {
+  display: grid;
+  gap: 6px;
+}
+
+.inline-control {
+  width: 100%;
+  min-height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  background: white;
+  font-weight: 800;
+}
+
+.inline-control:focus {
+  border-color: var(--teal);
+  outline: 3px solid rgba(15, 118, 110, 0.16);
+}
+
 .conversation {
   display: grid;
   gap: 10px;
