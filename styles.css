@@ -660,24 +660,6 @@ label.import-button {
   color: var(--ink);
 }
 
-.form-divider {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  color: var(--muted);
-  font-size: 0.78rem;
-  font-weight: 900;
-  text-transform: uppercase;
-}
-
-.form-divider::before,
-.form-divider::after {
-  content: "";
-  height: 1px;
-  flex: 1;
-  background: var(--line);
-}
-
 .profile-editor {
   display: grid;
   gap: 14px;

@@ -121,13 +121,10 @@ const elements = {
   cloudDialog: document.querySelector("#cloudDialog"),
   cloudForm: document.querySelector("#cloudForm"),
   cloudSummary: document.querySelector("#cloudSummary"),
-  cloudEmail: document.querySelector("#cloudEmail"),
-  cloudPassword: document.querySelector("#cloudPassword"),
   cloudError: document.querySelector("#cloudError"),
   cloudGoogleBtn: document.querySelector("#cloudGoogleBtn"),
   closeCloudBtn: document.querySelector("#closeCloudBtn"),
   cloudSignOutBtn: document.querySelector("#cloudSignOutBtn"),
-  cloudSignUpBtn: document.querySelector("#cloudSignUpBtn"),
   assistantChat: document.querySelector("#assistantChat"),
   assistantForm: document.querySelector("#assistantForm"),
   assistantInput: document.querySelector("#assistantInput"),
@@ -329,10 +326,9 @@ function bindEvents() {
   elements.profileName.addEventListener("input", renderProfilePreview);
   elements.profileColor.addEventListener("input", renderProfilePreview);
 
-  elements.cloudForm.addEventListener("submit", signInToCloud);
+  elements.cloudForm.addEventListener("submit", (event) => event.preventDefault());
   elements.closeCloudBtn.addEventListener("click", closeCloudDialog);
   elements.cloudGoogleBtn.addEventListener("click", signInWithGoogle);
-  elements.cloudSignUpBtn.addEventListener("click", createCloudLogin);
   elements.cloudSignOutBtn.addEventListener("click", signOutOfCloud);
   elements.cloudDialog.addEventListener("click", (event) => {
     if (event.target === elements.cloudDialog) closeCloudDialog();
@@ -521,15 +517,9 @@ function renderCloudStatus() {
 
 function openCloudDialog() {
   elements.cloudError.textContent = "";
-  elements.cloudPassword.value = "";
-  if (cloudState.user?.email) {
-    elements.cloudEmail.value = cloudState.user.email;
-  }
   renderCloudDialog();
   elements.cloudDialog.showModal();
-  if (!cloudState.user) {
-    elements.cloudEmail.focus();
-  }
+  if (!cloudState.user) elements.cloudGoogleBtn.focus();
   refreshIcons();
 }
 
@@ -579,21 +569,6 @@ function closeCloudDialog() {
   elements.cloudError.textContent = "";
 }
 
-function signInToCloud(event) {
-  event.preventDefault();
-  if (!cloudState.configured) {
-    elements.cloudError.textContent = "Add Firebase config first.";
-    return;
-  }
-
-  cloudState.auth
-    .signInWithEmailAndPassword(elements.cloudEmail.value.trim(), elements.cloudPassword.value)
-    .then(() => closeCloudDialog())
-    .catch((error) => {
-      elements.cloudError.textContent = firebaseErrorMessage(error);
-    });
-}
-
 function signInWithGoogle() {
   if (!cloudState.configured) {
     elements.cloudError.textContent = "Add Firebase config first.";
@@ -616,20 +591,6 @@ function signInWithGoogle() {
     });
 }
 
-function createCloudLogin() {
-  if (!cloudState.configured) {
-    elements.cloudError.textContent = "Add Firebase config first.";
-    return;
-  }
-
-  cloudState.auth
-    .createUserWithEmailAndPassword(elements.cloudEmail.value.trim(), elements.cloudPassword.value)
-    .then(() => closeCloudDialog())
-    .catch((error) => {
-      elements.cloudError.textContent = firebaseErrorMessage(error);
-    });
-}
-
 function signOutOfCloud() {
   if (!cloudState.auth) return;
   cloudState.auth.signOut().then(() => {
@@ -640,13 +601,12 @@ function signOutOfCloud() {
 
 function firebaseErrorMessage(error) {
   const code = error?.code || "";
-  if (code.includes("invalid-email")) return "Enter a valid email address.";
-  if (code.includes("weak-password")) return "Use a password with at least 6 characters.";
-  if (code.includes("email-already-in-use")) return "That email already has a login.";
   if (code.includes("unauthorized-domain")) return "Add this website domain in Firebase Authentication settings.";
   if (code.includes("popup-blocked")) return "Allow popups or try again in Safari/Chrome.";
-  if (code.includes("user-not-found") || code.includes("wrong-password") || code.includes("invalid-credential")) {
-    return "Email or password did not match.";
+  if (code.includes("popup-closed-by-user")) return "Google sign-in was closed before it finished.";
+  if (code.includes("operation-not-allowed")) return "Enable Google sign-in in Firebase Authentication.";
+  if (code.includes("invalid-credential")) {
+    return "Google sign-in did not complete. Try again.";
   }
   return error?.message || "Firebase sign-in failed.";
 }
