@@ -1358,6 +1358,7 @@ function renderTripDetail() {
         </div>
         <div class="detail-actions">
           ${tripMapLinks}
+          ${renderGoogleMapsImportForm(trip)}
           <button class="secondary-button" type="button" data-trip-edit="${escapeAttribute(trip.id)}"><i data-lucide="pencil"></i>Edit</button>
         </div>
       </div>
@@ -1379,7 +1380,6 @@ function renderTripDetail() {
         <div class="section-heading-inline">
           <h3>Daily plans</h3>
         </div>
-        ${renderGoogleMapsImportForm(trip)}
         ${renderTripDayForm(trip)}
         <div class="trip-day-list">${dayCards}</div>
       </section>
@@ -1458,14 +1458,17 @@ function renderGoogleMapsImportForm(trip) {
     .join("");
 
   return `
-    <form class="travel-form maps-import-form" data-google-maps-import data-trip-id="${escapeAttribute(trip.id)}">
-      <select name="dayId">
-        <option value="">New sightseeing day</option>
-        ${dayOptions}
-      </select>
-      <textarea name="places" rows="4" required placeholder="Paste Google Maps list places or exported CSV"></textarea>
-      <button class="secondary-button" type="submit"><i data-lucide="list-plus"></i>Import places</button>
-    </form>
+    <details class="maps-import-menu">
+      <summary class="secondary-button"><i data-lucide="list-plus"></i>Import places</summary>
+      <form class="travel-form maps-import-form" data-google-maps-import data-trip-id="${escapeAttribute(trip.id)}">
+        <select name="dayId">
+          <option value="">New sightseeing day</option>
+          ${dayOptions}
+        </select>
+        <textarea name="places" rows="4" required placeholder="Paste Google Maps list places or exported CSV"></textarea>
+        <button class="secondary-button" type="submit"><i data-lucide="plus"></i>Add to trip</button>
+      </form>
+    </details>
   `;
 }
 

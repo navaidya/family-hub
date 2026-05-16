@@ -964,6 +964,28 @@ label.import-button {
   align-items: start;
 }
 
+.maps-import-menu {
+  position: relative;
+}
+
+.maps-import-menu summary {
+  cursor: pointer;
+  list-style: none;
+}
+
+.maps-import-menu summary::-webkit-details-marker {
+  display: none;
+}
+
+.maps-import-menu .maps-import-form {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 20;
+  width: min(620px, calc(100vw - 32px));
+  box-shadow: var(--shadow);
+}
+
 .stop-card.food {
   border-left: 5px solid var(--coral);
 }
@@ -2003,6 +2025,18 @@ label.import-button {
 
   .travel-form {
     padding: 8px;
+  }
+
+  .maps-import-menu,
+  .maps-import-menu summary,
+  .maps-import-menu .maps-import-form {
+    width: 100%;
+  }
+
+  .maps-import-menu .maps-import-form {
+    position: static;
+    margin-top: 8px;
+    box-shadow: none;
   }
 
   .travel-form button,
