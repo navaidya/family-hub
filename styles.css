@@ -1516,6 +1516,22 @@ label.import-button {
     box-shadow: 0 8px 24px rgba(24, 33, 47, 0.06);
   }
 
+  .assistant-panel {
+    order: 1;
+  }
+
+  .reminder-panel {
+    order: 2;
+  }
+
+  .notebook-panel {
+    order: 3;
+  }
+
+  .calendar-panel {
+    order: 4;
+  }
+
   .panel-heading {
     gap: 10px;
     margin-bottom: 12px;
