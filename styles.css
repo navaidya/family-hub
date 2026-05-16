@@ -638,18 +638,51 @@ label.import-button {
   text-transform: none;
 }
 
-.credit-card-actions {
+.payment-toggle > span {
   display: grid;
+  grid-template-columns: auto 52px auto;
+  align-items: center;
   gap: 8px;
+  min-height: 42px;
+  text-transform: none;
 }
 
-.credit-card-actions .secondary-button {
-  width: 100%;
+.payment-toggle input {
+  position: relative;
+  width: 52px;
+  min-height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  appearance: none;
+  background: #f5c6bd;
+  cursor: pointer;
 }
 
-.payment-due {
-  color: #8a2d22;
-  background: #ffe3de;
+.payment-toggle input::after {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: white;
+  box-shadow: 0 2px 6px rgba(24, 33, 47, 0.2);
+  content: "";
+  transition: transform 0.18s ease;
+}
+
+.payment-toggle input:checked {
+  background: #8ed7b2;
+}
+
+.payment-toggle input:checked::after {
+  transform: translateX(24px);
+}
+
+.payment-toggle input:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 
 .finance-expense-card {

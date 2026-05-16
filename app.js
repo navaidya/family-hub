@@ -1635,16 +1635,14 @@ function renderCreditCards() {
                 Due day every month
                 <input data-card-field="dueDay" data-card-id="${escapeAttribute(card.id)}" type="number" min="1" max="31" step="1" value="${card.dueDay || ""}" placeholder="Day" ${canEdit ? "" : "disabled"} />
               </label>
-              <div class="credit-card-actions">
-                <button class="secondary-button ${paid ? "" : "payment-due"}" type="button" data-card-paid="${escapeAttribute(card.id)}" ${canEdit ? "" : "disabled"}>
-                  <i data-lucide="${paid ? "check-circle-2" : "circle-dollar-sign"}"></i>
-                  ${paid ? "Mark due" : "Mark paid"}
-                </button>
-                <button class="secondary-button" type="button" data-card-sms="${escapeAttribute(card.id)}">
-                  <i data-lucide="message-square"></i>
-                  Text
-                </button>
-              </div>
+              <label class="payment-toggle">
+                Payment status
+                <span>
+                  <span>Due</span>
+                  <input data-card-paid="${escapeAttribute(card.id)}" type="checkbox" ${paid ? "checked" : ""} ${canEdit ? "" : "disabled"} />
+                  <span>Paid</span>
+                </span>
+              </label>
             </div>
           </article>
         `;
@@ -1657,9 +1655,6 @@ function renderCreditCards() {
   });
   elements.financeCreditCardList.querySelectorAll("[data-card-paid]").forEach((button) => {
     button.addEventListener("click", () => toggleCreditCardPaid(button.dataset.cardPaid));
-  });
-  elements.financeCreditCardList.querySelectorAll("[data-card-sms]").forEach((button) => {
-    button.addEventListener("click", () => sendCreditCardReminder(button.dataset.cardSms));
   });
   refreshIcons();
 }
@@ -1877,25 +1872,6 @@ function toggleCreditCardPaid(cardId) {
   card.updatedAt = new Date().toISOString();
   saveState();
   renderFinance();
-}
-
-function sendCreditCardReminder(cardId) {
-  const card = state.creditCards.find((item) => item.id === cardId);
-  const naval = getMember(ADMIN_MEMBER_ID);
-  if (!card || !naval?.phone) {
-    window.alert("Add Naval's phone number in profile settings first.");
-    return;
-  }
-
-  const dueDate = creditCardDueDateForMonth(card, visibleFinanceMonth);
-  const status = isCreditCardPaidForFinanceMonth(card) ? "Paid" : "Due";
-  const body = [
-    `Family Hub credit card reminder: ${card.name}`,
-    `Status: ${status}`,
-    `Due: ${dueDate ? formatLongDate(dueDate) : "Due day not set"}`,
-    `Amount: ${formatMoney(card.billAmount)}`,
-  ].join("\n");
-  openSms(naval.phone, body);
 }
 
 function handleFinanceDragOver(event) {
