@@ -151,9 +151,9 @@ const isoToday = toISODate(today);
 let state = loadState();
 let activeStatus = "all";
 let activeMainView = "tasks";
-let activeTaskMemberId = state.currentMemberId || "me";
+let activeTaskMemberId = "all";
 let activeWishMemberId = state.currentMemberId || "me";
-let selectedTaskId = state.tasks[0]?.id ?? null;
+let selectedTaskId = null;
 let selectedTripId = state.trips?.[0]?.id ?? null;
 let selectedWishId = state.wishes?.[0]?.id ?? null;
 let visibleMonth = new Date(today.getFullYear(), today.getMonth(), 1);
@@ -863,10 +863,10 @@ function applyRemoteFamilyData(data = {}) {
   }
 
   if (!state.tasks.some((task) => task.id === selectedTaskId)) {
-    selectedTaskId = state.tasks[0]?.id ?? null;
+    selectedTaskId = null;
   }
 
-  if (!getMember(activeTaskMemberId)) {
+  if (activeTaskMemberId !== "all" && !getMember(activeTaskMemberId)) {
     activeTaskMemberId = state.currentMemberId || state.members[0]?.id || "me";
   }
 
@@ -2563,16 +2563,25 @@ function closeProfileDialog() {
 }
 
 function renderStatusTabs() {
-  if (!getMember(activeTaskMemberId)) {
-    activeTaskMemberId = state.currentMemberId || state.members[0]?.id || "me";
+  if (activeTaskMemberId !== "all" && !getMember(activeTaskMemberId)) {
+    activeTaskMemberId = "all";
   }
 
-  elements.statusTabs.innerHTML = state.members
+  const activeTasks = state.tasks.filter((task) => task.status !== "done");
+  const tabs = [
+    { id: "all", label: "All", count: activeTasks.length },
+    ...state.members.map((member) => ({
+      id: member.id,
+      label: member.name,
+      count: activeTasks.filter((task) => task.assignee === member.id).length,
+    })),
+  ];
+
+  elements.statusTabs.innerHTML = tabs
     .map((member) => {
-      const count = state.tasks.filter((task) => task.assignee === member.id && task.status !== "done").length;
       return `
         <button class="segment ${activeTaskMemberId === member.id ? "active" : ""}" type="button" data-task-member="${member.id}">
-          ${escapeHTML(member.name)} ${count}
+          ${escapeHTML(member.label)} ${member.count}
         </button>
       `;
     })
@@ -2584,7 +2593,6 @@ function renderStatusTabs() {
       selectedTaskId = null;
       renderStatusTabs();
       renderTasks();
-      renderDetail();
     });
   });
 }
@@ -2613,23 +2621,7 @@ function populateFormOptions() {
 
 function renderTasks() {
   const query = elements.searchInput.value.trim().toLowerCase();
-  const tasks = getSortedTasks().filter((task) => {
-    const matchesMember = task.assignee === activeTaskMemberId;
-    const haystack = [task.title, task.description, task.type, memberName(task.requester), memberName(task.assignee)]
-      .join(" ")
-      .toLowerCase();
-    return matchesMember && (!query || haystack.includes(query));
-  });
-
-  if (!tasks.some((task) => task.id === selectedTaskId)) {
-    selectedTaskId = tasks[0]?.id ?? null;
-  }
-
-  if (!tasks.length) {
-    selectedTaskId = null;
-    elements.taskList.innerHTML = `<div class="empty-state">No assigned tasks for ${escapeHTML(memberName(activeTaskMemberId))}.</div>`;
-    return;
-  }
+  const tasks = getVisibleTaskCalendarTasks(query);
 
   elements.taskList.innerHTML = tasks
     .map((task) => {
@@ -2660,12 +2652,11 @@ function renderTasks() {
   elements.taskList.querySelectorAll("[data-task-id]").forEach((button) => {
     button.addEventListener("click", () => {
       selectedTaskId = button.dataset.taskId;
-      renderTasks();
-      renderDetail();
-      refreshIcons();
+      openTaskDialog(getSelectedTask());
     });
   });
 
+  renderCalendar();
   refreshIcons();
 }
 
@@ -2828,6 +2819,16 @@ function updateTaskInlineField(event) {
   renderReminders();
 }
 
+function getVisibleTaskCalendarTasks(query = elements.searchInput.value.trim().toLowerCase()) {
+  return getSortedTasks().filter((task) => {
+    const matchesMember = activeTaskMemberId === "all" || task.assignee === activeTaskMemberId;
+    const haystack = [task.title, task.description, task.type, task.status, memberName(task.requester), memberName(task.assignee)]
+      .join(" ")
+      .toLowerCase();
+    return matchesMember && (!query || haystack.includes(query));
+  });
+}
+
 function renderCalendar() {
   const monthName = visibleMonth.toLocaleDateString(undefined, { month: "long", year: "numeric" });
   elements.monthLabel.textContent = monthName;
@@ -2843,14 +2844,14 @@ function renderCalendar() {
     days.push(date);
   }
 
+  const visibleTasks = getVisibleTaskCalendarTasks();
+
   elements.calendarGrid.innerHTML = `
     ${weekdays.map((day) => `<div class="calendar-weekday">${day}</div>`).join("")}
     ${days
       .map((date) => {
         const iso = toISODate(date);
-        const tasks = state.tasks.filter((task) => task.dueDate === iso);
-        const tripEvents = getTripEventsForDate(iso);
-        const wishEvents = getWishEventsForDate(iso);
+        const tasks = visibleTasks.filter((task) => task.dueDate === iso);
         const outside = date.getMonth() !== visibleMonth.getMonth();
         const isToday = iso === isoToday;
         return `
@@ -2861,25 +2862,8 @@ function renderCalendar() {
                 .map(
                   (task) => `
                     <button class="calendar-task ${task.priority} ${task.status === "done" ? "done" : ""}" type="button" data-task-id="${task.id}" title="${escapeAttribute(task.title)}">
-                      ${escapeHTML(task.title)}
-                    </button>
-                  `,
-                )
-                .join("")}
-              ${tripEvents
-                .map(
-                  (event) => `
-                    <button class="calendar-task trip" type="button" data-calendar-trip="${event.tripId}" title="${escapeAttribute(event.title)}">
-                      ${escapeHTML(event.title)}
-                    </button>
-                  `,
-                )
-                .join("")}
-              ${wishEvents
-                .map(
-                  (event) => `
-                    <button class="calendar-task wish" type="button" data-calendar-wish="${event.wishId}" title="${escapeAttribute(event.title)}">
-                      ${escapeHTML(event.title)}
+                      <strong>${escapeHTML(task.title)}</strong>
+                      <span>${escapeHTML(memberName(task.assignee))} · ${escapeHTML(statusLabel(task.status))}</span>
                     </button>
                   `,
                 )
@@ -2895,31 +2879,7 @@ function renderCalendar() {
     button.addEventListener("click", () => {
       activeMainView = "tasks";
       selectedTaskId = button.dataset.taskId;
-      renderMainTabs();
-      renderTasks();
-      renderDetail();
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    });
-  });
-
-  elements.calendarGrid.querySelectorAll("[data-calendar-trip]").forEach((button) => {
-    button.addEventListener("click", () => {
-      activeMainView = "vacation";
-      selectedTripId = button.dataset.calendarTrip;
-      renderMainTabs();
-      renderTrips();
-      elements.tripDetail.scrollIntoView({ behavior: "smooth", block: "start" });
-    });
-  });
-
-  elements.calendarGrid.querySelectorAll("[data-calendar-wish]").forEach((button) => {
-    button.addEventListener("click", () => {
-      activeMainView = "wishlist";
-      selectedWishId = button.dataset.calendarWish;
-      activeWishMemberId = getSelectedWish()?.owner || activeWishMemberId;
-      renderMainTabs();
-      renderWishes();
-      elements.wishDetail.scrollIntoView({ behavior: "smooth", block: "start" });
+      openTaskDialog(getSelectedTask());
     });
   });
 }
@@ -3930,7 +3890,7 @@ function deleteCurrentTask() {
   if (!confirmed) return;
 
   state.tasks = state.tasks.filter((item) => item.id !== id);
-  selectedTaskId = state.tasks[0]?.id ?? null;
+  selectedTaskId = null;
   saveState();
   closeTaskDialog();
   render();
@@ -4012,7 +3972,7 @@ function makeTaskFromWish(wishId) {
   selectedTaskId = task.id;
   saveState();
   render();
-  document.querySelector(".dashboard-grid")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  document.querySelector(".task-calendar-layout")?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 function markWishDone(wishId) {

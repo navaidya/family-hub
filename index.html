@@ -190,7 +190,7 @@
         </div>
       </section>
 
-      <section class="dashboard-grid tab-view" id="taskView">
+      <section class="task-calendar-layout tab-view" id="taskView">
         <section class="task-panel" aria-label="Task lists">
           <div class="panel-heading">
             <div>
@@ -210,38 +210,30 @@
           </div>
 
           <nav class="segmented-control member-filter-tabs" id="statusTabs" aria-label="Task member filters"></nav>
-          <div class="task-list" id="taskList"></div>
-        </section>
-
-        <aside class="detail-panel" aria-label="Task details">
-          <div id="taskDetail" class="empty-detail">
-            <i data-lucide="list-checks"></i>
-            <h2>Select a task</h2>
-            <p>Pick one from the list.</p>
+          <div class="calendar-panel embedded-calendar" aria-label="Task calendar">
+            <div class="panel-heading compact">
+              <div>
+                <p class="eyebrow">Due dates</p>
+                <h2 id="monthLabel">Calendar</h2>
+              </div>
+              <div class="calendar-controls">
+                <button class="icon-button" id="prevMonthBtn" type="button" title="Previous month" aria-label="Previous month">
+                  <i data-lucide="chevron-left">‹</i>
+                </button>
+                <button class="secondary-button" id="todayBtn" type="button">Today</button>
+                <button class="icon-button" id="nextMonthBtn" type="button" title="Next month" aria-label="Next month">
+                  <i data-lucide="chevron-right">›</i>
+                </button>
+              </div>
+            </div>
+            <div class="calendar" id="calendarGrid"></div>
           </div>
-        </aside>
+          <div class="task-list" id="taskList" hidden></div>
+          <div id="taskDetail" class="empty-detail" hidden></div>
+        </section>
       </section>
 
       <section class="lower-grid" id="taskSupportView">
-        <section class="calendar-panel" aria-label="Calendar">
-          <div class="panel-heading compact">
-            <div>
-              <p class="eyebrow">Due dates</p>
-              <h2 id="monthLabel">Calendar</h2>
-            </div>
-            <div class="calendar-controls">
-              <button class="icon-button" id="prevMonthBtn" type="button" title="Previous month" aria-label="Previous month">
-                <i data-lucide="chevron-left">‹</i>
-              </button>
-              <button class="secondary-button" id="todayBtn" type="button">Today</button>
-              <button class="icon-button" id="nextMonthBtn" type="button" title="Next month" aria-label="Next month">
-                <i data-lucide="chevron-right">›</i>
-              </button>
-            </div>
-          </div>
-          <div class="calendar" id="calendarGrid"></div>
-        </section>
-
         <section class="reminder-panel" aria-label="Upcoming due dates">
           <div class="panel-heading compact">
             <div>
