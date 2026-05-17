@@ -187,6 +187,11 @@ const elements = {
   vacationTripMonthBtn: document.querySelector("#vacationTripMonthBtn"),
   vacationNextMonthBtn: document.querySelector("#vacationNextMonthBtn"),
   vacationCalendarGrid: document.querySelector("#vacationCalendarGrid"),
+  vacationItemDialog: document.querySelector("#vacationItemDialog"),
+  vacationItemForm: document.querySelector("#vacationItemForm"),
+  vacationItemDialogTitle: document.querySelector("#vacationItemDialogTitle"),
+  closeVacationItemDialogBtn: document.querySelector("#closeVacationItemDialogBtn"),
+  deleteVacationItemBtn: document.querySelector("#deleteVacationItemBtn"),
   financeUploadBtn: document.querySelector("#financeUploadBtn"),
   financeFileInput: document.querySelector("#financeFileInput"),
   financeDropZone: document.querySelector("#financeDropZone"),
@@ -302,6 +307,19 @@ const tripForm = {
   startDate: document.querySelector("#tripStartDate"),
   endDate: document.querySelector("#tripEndDate"),
   notes: document.querySelector("#tripNotes"),
+};
+
+const vacationItemForm = {
+  id: document.querySelector("#vacationItemId"),
+  sourceDayId: document.querySelector("#vacationItemSourceDayId"),
+  type: document.querySelector("#vacationItemType"),
+  date: document.querySelector("#vacationItemDate"),
+  endDate: document.querySelector("#vacationItemEndDate"),
+  time: document.querySelector("#vacationItemTime"),
+  name: document.querySelector("#vacationItemName"),
+  address: document.querySelector("#vacationItemAddress"),
+  url: document.querySelector("#vacationItemUrl"),
+  notes: document.querySelector("#vacationItemNotes"),
 };
 
 const wishForm = {
@@ -651,6 +669,10 @@ function bindEvents() {
     visibleVacationMonth = monthForDate(trip?.startDate) || new Date(today.getFullYear(), today.getMonth(), 1);
     renderVacationCalendar();
   });
+  elements.closeVacationItemDialogBtn.addEventListener("click", closeVacationItemDialog);
+  elements.vacationItemForm.addEventListener("submit", saveVacationItemFromForm);
+  elements.deleteVacationItemBtn.addEventListener("click", deleteCurrentVacationItem);
+  vacationItemForm.type.addEventListener("change", syncVacationItemTypeFields);
   elements.financeUploadBtn.addEventListener("click", () => elements.financeFileInput.click());
   elements.financeFileInput.addEventListener("change", (event) => processFinanceFiles(event.target.files));
   elements.financeDropZone.addEventListener("click", () => elements.financeFileInput.click());
@@ -691,6 +713,10 @@ function bindEvents() {
 
   elements.tripDialog.addEventListener("click", (event) => {
     if (event.target === elements.tripDialog) closeTripDialog();
+  });
+
+  elements.vacationItemDialog.addEventListener("click", (event) => {
+    if (event.target === elements.vacationItemDialog) closeVacationItemDialog();
   });
 
   elements.wishDialog.addEventListener("click", (event) => {
@@ -1405,22 +1431,20 @@ function renderTripDetail() {
           <h3>Hotel stays</h3>
         </div>
         <div class="hotel-list">${hotelCards}</div>
-        ${renderHotelForm(trip)}
       </section>
 
       <section class="trip-section">
         <div class="section-heading-inline">
           <h3>Daily plans</h3>
         </div>
-        ${renderTripDayForm(trip)}
         <div class="trip-day-list">${dayCards}</div>
       </section>
     </div>
   `;
 
   elements.tripDetail.querySelector("[data-trip-edit]").addEventListener("click", () => openTripDialog(trip));
-  elements.tripDetail.querySelector("[data-hotel-form]").addEventListener("submit", addHotelToTrip);
-  elements.tripDetail.querySelector("[data-day-form]").addEventListener("submit", addDayToTrip);
+  elements.tripDetail.querySelector("[data-hotel-form]")?.addEventListener("submit", addHotelToTrip);
+  elements.tripDetail.querySelector("[data-day-form]")?.addEventListener("submit", addDayToTrip);
   elements.tripDetail.querySelector("[data-google-maps-import]").addEventListener("submit", importGoogleMapsPlaces);
   elements.tripDetail.querySelectorAll("[data-hotel-delete]").forEach((button) => {
     button.addEventListener("click", () => deleteHotelFromTrip(button.dataset.hotelDelete));
@@ -1477,13 +1501,13 @@ function renderVacationCalendar() {
         const outside = date.getMonth() !== visibleVacationMonth.getMonth();
         const isToday = iso === isoToday;
         return `
-          <div class="calendar-day ${outside ? "outside" : ""} ${isToday ? "today" : ""}">
+          <div class="calendar-day ${outside ? "outside" : ""} ${isToday ? "today" : ""}" data-vacation-date="${iso}">
             <span class="day-number">${date.getDate()}</span>
             <div class="calendar-items">
               ${events
                 .map(
                   (event) => `
-                    <button class="calendar-task vacation-${event.kind}" type="button" data-vacation-target="${escapeAttribute(event.target)}" data-vacation-target-id="${escapeAttribute(event.targetId)}" title="${escapeAttribute(event.title)}">
+                    <button class="calendar-task vacation-${event.kind}" type="button" draggable="${event.draggable ? "true" : "false"}" data-vacation-target="${escapeAttribute(event.target)}" data-vacation-target-id="${escapeAttribute(event.targetId)}" data-vacation-source-day-id="${escapeAttribute(event.sourceDayId || "")}" title="${escapeAttribute(event.title)}">
                       <strong>${escapeHTML(event.title)}</strong>
                       ${event.meta ? `<span>${escapeHTML(event.meta)}</span>` : ""}
                     </button>
@@ -1498,9 +1522,240 @@ function renderVacationCalendar() {
   `;
 
   elements.vacationCalendarGrid.querySelectorAll("[data-vacation-target]").forEach((button) => {
-    button.addEventListener("click", () => scrollToVacationTarget(button.dataset.vacationTarget, button.dataset.vacationTargetId));
+    button.addEventListener("click", (event) => {
+      event.stopPropagation();
+      openVacationItemFromCalendar(button.dataset.vacationTarget, button.dataset.vacationTargetId, button.dataset.vacationSourceDayId);
+    });
+    button.addEventListener("dragstart", handleVacationCalendarDragStart);
+    button.addEventListener("dragend", handleVacationCalendarDragEnd);
+  });
+  elements.vacationCalendarGrid.querySelectorAll("[data-vacation-date]").forEach((day) => {
+    day.addEventListener("click", () => openVacationItemDialog({ date: day.dataset.vacationDate }));
+    day.addEventListener("dragover", handleVacationCalendarDragOver);
+    day.addEventListener("dragleave", handleVacationCalendarDragLeave);
+    day.addEventListener("drop", handleVacationCalendarDrop);
   });
   refreshIcons();
+}
+
+function openVacationItemFromCalendar(target, targetId, sourceDayId = "") {
+  const trip = getSelectedTrip();
+  if (!trip) return;
+
+  if (target === "trip" || target === "day") {
+    scrollToVacationTarget(target, targetId);
+    return;
+  }
+
+  if (target === "hotel") {
+    const hotel = trip.hotels.find((item) => item.id === targetId);
+    if (hotel) openVacationItemDialog({ item: hotel, type: "hotel" });
+    return;
+  }
+
+  if (target === "stop") {
+    const match = findTripStop(trip, targetId, sourceDayId);
+    if (match) openVacationItemDialog({ item: match.stop, type: match.stop.type, sourceDayId: match.day.id, date: match.day.date });
+  }
+}
+
+function openVacationItemDialog({ date = isoToday, item = null, type = "sightseeing", sourceDayId = "" } = {}) {
+  const trip = getSelectedTrip();
+  if (!trip) {
+    window.alert("Add a trip first.");
+    return;
+  }
+
+  const isHotel = type === "hotel";
+  elements.vacationItemDialogTitle.textContent = item ? "Edit vacation item" : "New vacation item";
+  elements.deleteVacationItemBtn.style.visibility = item ? "visible" : "hidden";
+  vacationItemForm.id.value = item?.id ?? "";
+  vacationItemForm.sourceDayId.value = sourceDayId;
+  vacationItemForm.type.value = isHotel ? "hotel" : type;
+  vacationItemForm.date.value = isHotel ? item?.checkIn || date : date;
+  vacationItemForm.endDate.value = isHotel ? item?.checkOut || addDays(vacationItemForm.date.value, 1) : "";
+  vacationItemForm.time.value = isHotel ? "" : item?.time || "";
+  vacationItemForm.name.value = item?.name || "";
+  vacationItemForm.address.value = item?.address || "";
+  vacationItemForm.url.value = isHotel ? item?.bookingUrl || "" : item?.url || "";
+  vacationItemForm.notes.value = item?.notes || "";
+  syncVacationItemTypeFields();
+  elements.vacationItemDialog.showModal();
+  vacationItemForm.name.focus();
+  refreshIcons();
+}
+
+function closeVacationItemDialog() {
+  elements.vacationItemDialog.close();
+  elements.vacationItemForm.reset();
+  vacationItemForm.sourceDayId.value = "";
+}
+
+function syncVacationItemTypeFields() {
+  const isHotel = vacationItemForm.type.value === "hotel";
+  vacationItemForm.endDate.disabled = !isHotel;
+  vacationItemForm.time.disabled = isHotel;
+  vacationItemForm.endDate.required = isHotel;
+  vacationItemForm.endDate.closest("label").style.opacity = isHotel ? "1" : "0.55";
+  vacationItemForm.time.closest("label").style.opacity = isHotel ? "0.55" : "1";
+}
+
+function saveVacationItemFromForm(event) {
+  event.preventDefault();
+  const trip = getSelectedTrip();
+  if (!trip) return;
+
+  const id = vacationItemForm.id.value || crypto.randomUUID();
+  const type = vacationItemForm.type.value;
+  const date = vacationItemForm.date.value || trip.startDate;
+  const existingHotel = trip.hotels.find((hotel) => hotel.id === id);
+  const existingStop = findTripStop(trip, id, vacationItemForm.sourceDayId.value);
+
+  if (type === "hotel") {
+    if (existingStop) {
+      existingStop.day.stops = existingStop.day.stops.filter((stop) => stop.id !== id);
+    }
+    const checkOut = vacationItemForm.endDate.value && vacationItemForm.endDate.value >= date ? vacationItemForm.endDate.value : addDays(date, 1);
+    const hotel = {
+      id,
+      name: vacationItemForm.name.value.trim(),
+      address: vacationItemForm.address.value.trim(),
+      checkIn: date,
+      checkOut,
+      bookingUrl: vacationItemForm.url.value.trim(),
+      notes: vacationItemForm.notes.value.trim(),
+    };
+    if (existingHotel) {
+      trip.hotels = trip.hotels.map((item) => (item.id === id ? hotel : item));
+    } else {
+      trip.hotels.push(hotel);
+    }
+    trip.hotels.sort((a, b) => String(a.checkIn || "").localeCompare(String(b.checkIn || "")));
+  } else {
+    if (existingHotel) {
+      trip.hotels = trip.hotels.filter((hotel) => hotel.id !== id);
+    }
+    const targetDay = ensureTripDayForDate(trip, date);
+    const stop = {
+      id,
+      type,
+      time: vacationItemForm.time.value.trim(),
+      name: vacationItemForm.name.value.trim(),
+      address: vacationItemForm.address.value.trim(),
+      url: vacationItemForm.url.value.trim(),
+      notes: vacationItemForm.notes.value.trim(),
+      addedBy: existingStop?.stop.addedBy || state.currentMemberId,
+      addedAt: existingStop?.stop.addedAt || new Date().toISOString(),
+      source: existingStop?.stop.source || "Vacation calendar",
+      updatedBy: state.currentMemberId,
+      updatedAt: new Date().toISOString(),
+    };
+    if (existingStop && existingStop.day.id !== targetDay.id) {
+      existingStop.day.stops = existingStop.day.stops.filter((item) => item.id !== id);
+    }
+    targetDay.stops = targetDay.stops.filter((item) => item.id !== id);
+    targetDay.stops.push(stop);
+    targetDay.stops.sort((a, b) => a.time.localeCompare(b.time));
+  }
+
+  trip.updatedAt = new Date().toISOString();
+  visibleVacationMonth = monthForDate(date) || visibleVacationMonth;
+  saveState();
+  closeVacationItemDialog();
+  renderTrips();
+}
+
+function deleteCurrentVacationItem() {
+  const trip = getSelectedTrip();
+  const id = vacationItemForm.id.value;
+  if (!trip || !id) return;
+
+  const confirmed = window.confirm("Delete this vacation item?");
+  if (!confirmed) return;
+
+  const hotelCount = trip.hotels.length;
+  trip.hotels = trip.hotels.filter((hotel) => hotel.id !== id);
+  const match = findTripStop(trip, id, vacationItemForm.sourceDayId.value);
+  if (match) {
+    match.day.stops = match.day.stops.filter((stop) => stop.id !== id);
+  }
+
+  if (hotelCount !== trip.hotels.length || match) {
+    trip.updatedAt = new Date().toISOString();
+    saveState();
+  }
+  closeVacationItemDialog();
+  renderTrips();
+}
+
+function handleVacationCalendarDragStart(event) {
+  const button = event.currentTarget;
+  if (button.draggable !== true) return;
+  button.classList.add("dragging");
+  event.dataTransfer.effectAllowed = "move";
+  event.dataTransfer.setData(
+    "application/json",
+    JSON.stringify({
+      target: button.dataset.vacationTarget,
+      targetId: button.dataset.vacationTargetId,
+      sourceDayId: button.dataset.vacationSourceDayId || "",
+    }),
+  );
+}
+
+function handleVacationCalendarDragEnd(event) {
+  event.currentTarget.classList.remove("dragging");
+  elements.vacationCalendarGrid.querySelectorAll(".drag-over").forEach((item) => item.classList.remove("drag-over"));
+}
+
+function handleVacationCalendarDragOver(event) {
+  event.preventDefault();
+  event.currentTarget.classList.add("drag-over");
+}
+
+function handleVacationCalendarDragLeave(event) {
+  event.currentTarget.classList.remove("drag-over");
+}
+
+function handleVacationCalendarDrop(event) {
+  event.preventDefault();
+  event.currentTarget.classList.remove("drag-over");
+  const date = event.currentTarget.dataset.vacationDate;
+  try {
+    const payload = JSON.parse(event.dataTransfer.getData("application/json"));
+    moveVacationCalendarItem(payload, date);
+  } catch (error) {
+    console.warn("Could not move vacation item", error);
+  }
+}
+
+function moveVacationCalendarItem(payload, date) {
+  const trip = getSelectedTrip();
+  if (!trip || !date) return;
+
+  if (payload.target === "hotel") {
+    const hotel = trip.hotels.find((item) => item.id === payload.targetId);
+    if (!hotel) return;
+    const duration = Math.max(1, Math.round((parseLocalDate(hotel.checkOut || addDays(hotel.checkIn, 1)) - parseLocalDate(hotel.checkIn || date)) / 86400000));
+    hotel.checkIn = date;
+    hotel.checkOut = addDays(date, duration);
+  }
+
+  if (payload.target === "stop") {
+    const match = findTripStop(trip, payload.targetId, payload.sourceDayId);
+    if (!match) return;
+    const targetDay = ensureTripDayForDate(trip, date);
+    if (match.day.id !== targetDay.id) {
+      match.day.stops = match.day.stops.filter((stop) => stop.id !== payload.targetId);
+      targetDay.stops.push(match.stop);
+      targetDay.stops.sort((a, b) => a.time.localeCompare(b.time));
+    }
+  }
+
+  trip.updatedAt = new Date().toISOString();
+  visibleVacationMonth = monthForDate(date) || visibleVacationMonth;
+  saveState();
+  renderTrips();
 }
 
 function renderHotelCard(hotel) {
@@ -4202,6 +4457,33 @@ function getSelectedTrip() {
   return state.trips.find((trip) => trip.id === selectedTripId) ?? null;
 }
 
+function findTripStop(trip, stopId, preferredDayId = "") {
+  const days = preferredDayId
+    ? [...trip.days.filter((day) => day.id === preferredDayId), ...trip.days.filter((day) => day.id !== preferredDayId)]
+    : trip.days;
+  for (const day of days) {
+    const stop = day.stops.find((item) => item.id === stopId);
+    if (stop) return { day, stop };
+  }
+  return null;
+}
+
+function ensureTripDayForDate(trip, date) {
+  let day = trip.days.find((item) => item.date === date);
+  if (day) return day;
+
+  day = {
+    id: crypto.randomUUID(),
+    date,
+    title: "",
+    notes: "",
+    stops: [],
+  };
+  trip.days.push(day);
+  trip.days.sort((a, b) => a.date.localeCompare(b.date));
+  return day;
+}
+
 function getSelectedWish() {
   return state.wishes.find((wish) => wish.id === selectedWishId) ?? null;
 }
@@ -4228,26 +4510,25 @@ function getVacationCalendarEventsForDate(trip, dateString) {
   const events = [];
 
   if (dateString === trip.startDate) {
-    events.push({ kind: "trip", target: "trip", targetId: trip.id, title: `Start: ${trip.title}`, meta: trip.destination });
+    events.push({ kind: "trip", target: "trip", targetId: trip.id, title: `Start: ${trip.title}`, meta: trip.destination, draggable: false });
   }
   if (dateString === trip.endDate && trip.endDate !== trip.startDate) {
-    events.push({ kind: "trip", target: "trip", targetId: trip.id, title: `End: ${trip.title}`, meta: trip.destination });
+    events.push({ kind: "trip", target: "trip", targetId: trip.id, title: `End: ${trip.title}`, meta: trip.destination, draggable: false });
   }
 
   trip.hotels.forEach((hotel) => {
     if (dateString === hotel.checkIn) {
-      events.push({ kind: "hotel", target: "hotel", targetId: hotel.id, title: `Check in: ${hotel.name}`, meta: hotel.address });
+      events.push({ kind: "hotel", target: "hotel", targetId: hotel.id, title: `Check in: ${hotel.name}`, meta: hotel.address, draggable: true });
     } else if (dateString === hotel.checkOut) {
-      events.push({ kind: "hotel", target: "hotel", targetId: hotel.id, title: `Check out: ${hotel.name}`, meta: hotel.address });
+      events.push({ kind: "hotel", target: "hotel", targetId: hotel.id, title: `Check out: ${hotel.name}`, meta: hotel.address, draggable: true });
     } else if (hotel.checkIn && hotel.checkOut && dateString > hotel.checkIn && dateString < hotel.checkOut) {
-      events.push({ kind: "hotel", target: "hotel", targetId: hotel.id, title: `Stay: ${hotel.name}`, meta: hotel.address });
+      events.push({ kind: "hotel", target: "hotel", targetId: hotel.id, title: `Stay: ${hotel.name}`, meta: hotel.address, draggable: true });
     }
   });
 
   trip.days
     .filter((day) => day.date === dateString)
     .forEach((day) => {
-      events.push({ kind: "day", target: "day", targetId: day.id, title: day.title || "Daily plan", meta: day.notes });
       day.stops
         .slice()
         .sort((a, b) => String(a.time || "").localeCompare(String(b.time || "")))
@@ -4256,8 +4537,10 @@ function getVacationCalendarEventsForDate(trip, dateString) {
             kind: stop.type === "hotel" ? "hotel" : "stop",
             target: "stop",
             targetId: stop.id,
+            sourceDayId: day.id,
             title: stop.time ? `${stop.time} ${stop.name}` : stop.name,
             meta: tripStopTypeLabel(stop.type),
+            draggable: true,
           });
         });
     });

@@ -94,26 +94,26 @@
         </div>
         <div class="travel-grid">
           <div class="trip-list" id="tripList" role="tablist" aria-label="Trips"></div>
+          <section class="calendar-panel vacation-calendar-panel" aria-label="Vacation calendar">
+            <div class="panel-heading compact">
+              <div>
+                <p class="eyebrow">Vacation calendar</p>
+                <h2 id="vacationMonthLabel">Calendar</h2>
+              </div>
+              <div class="calendar-controls">
+                <button class="icon-button" id="vacationPrevMonthBtn" type="button" title="Previous month" aria-label="Previous vacation month">
+                  <i data-lucide="chevron-left">‹</i>
+                </button>
+                <button class="secondary-button" id="vacationTripMonthBtn" type="button">Trip month</button>
+                <button class="icon-button" id="vacationNextMonthBtn" type="button" title="Next month" aria-label="Next vacation month">
+                  <i data-lucide="chevron-right">›</i>
+                </button>
+              </div>
+            </div>
+            <div class="calendar vacation-calendar" id="vacationCalendarGrid"></div>
+          </section>
           <div class="trip-detail trip-page" id="tripDetail"></div>
         </div>
-        <section class="calendar-panel vacation-calendar-panel" aria-label="Vacation calendar">
-          <div class="panel-heading compact">
-            <div>
-              <p class="eyebrow">Vacation calendar</p>
-              <h2 id="vacationMonthLabel">Calendar</h2>
-            </div>
-            <div class="calendar-controls">
-              <button class="icon-button" id="vacationPrevMonthBtn" type="button" title="Previous month" aria-label="Previous vacation month">
-                <i data-lucide="chevron-left">‹</i>
-              </button>
-              <button class="secondary-button" id="vacationTripMonthBtn" type="button">Trip month</button>
-              <button class="icon-button" id="vacationNextMonthBtn" type="button" title="Next month" aria-label="Next vacation month">
-                <i data-lucide="chevron-right">›</i>
-              </button>
-            </div>
-          </div>
-          <div class="calendar vacation-calendar" id="vacationCalendarGrid"></div>
-        </section>
       </section>
 
       <section class="finance-panel tab-view" id="financeView" aria-label="Finance budgeting">
@@ -500,6 +500,82 @@
           <button class="primary-button" type="submit">
             <i data-lucide="save"></i>
             Save trip
+          </button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="vacationItemDialog" class="task-dialog">
+      <form id="vacationItemForm" method="dialog">
+        <div class="dialog-heading">
+          <div>
+            <p class="eyebrow">Vacation calendar</p>
+            <h2 id="vacationItemDialogTitle">New item</h2>
+          </div>
+          <button class="icon-button" id="closeVacationItemDialogBtn" value="cancel" type="button" title="Close" aria-label="Close">
+            <i data-lucide="x">×</i>
+          </button>
+        </div>
+
+        <input id="vacationItemId" type="hidden" />
+        <input id="vacationItemSourceDayId" type="hidden" />
+
+        <div class="form-grid">
+          <label>
+            Type
+            <select id="vacationItemType">
+              <option value="sightseeing">Sightseeing stop</option>
+              <option value="food">Restaurant / food stop</option>
+              <option value="hotel">Hotel stay</option>
+              <option value="drive">Drive</option>
+              <option value="other">Other</option>
+            </select>
+          </label>
+
+          <label>
+            Date
+            <input id="vacationItemDate" type="date" required />
+          </label>
+
+          <label>
+            End date
+            <input id="vacationItemEndDate" type="date" />
+          </label>
+
+          <label>
+            Time
+            <input id="vacationItemTime" maxlength="20" placeholder="Optional" />
+          </label>
+        </div>
+
+        <label>
+          Name
+          <input id="vacationItemName" required maxlength="90" placeholder="Hotel, restaurant, place, or activity" />
+        </label>
+
+        <label>
+          Address
+          <input id="vacationItemAddress" maxlength="160" placeholder="Address or map search text" />
+        </label>
+
+        <label>
+          Link
+          <input id="vacationItemUrl" type="url" placeholder="Website, booking, menu, or map link" />
+        </label>
+
+        <label>
+          Notes
+          <textarea id="vacationItemNotes" rows="4" maxlength="260" placeholder="Confirmation, tickets, must order, parking, or anything useful"></textarea>
+        </label>
+
+        <div class="dialog-actions">
+          <button class="secondary-button" id="deleteVacationItemBtn" type="button">
+            <i data-lucide="trash-2"></i>
+            Delete
+          </button>
+          <button class="primary-button" type="submit">
+            <i data-lucide="save"></i>
+            Save item
           </button>
         </div>
       </form>

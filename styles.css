@@ -1628,6 +1628,12 @@ label.import-button {
   outline-offset: -3px;
 }
 
+.calendar-day.drag-over {
+  outline: 3px solid rgba(71, 84, 163, 0.36);
+  outline-offset: -3px;
+  background: #f3f5ff;
+}
+
 .day-number {
   display: inline-flex;
   align-items: center;
@@ -1696,6 +1702,10 @@ label.import-button {
 .calendar-task.done {
   text-decoration: line-through;
   opacity: 0.68;
+}
+
+.calendar-task.dragging {
+  opacity: 0.45;
 }
 
 .reminder-list {
