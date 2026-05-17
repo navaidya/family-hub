@@ -3216,7 +3216,8 @@ function getVisibleTaskCalendarTasks(query = elements.searchInput.value.trim().t
 
 function renderCalendar() {
   const monthName = visibleMonth.toLocaleDateString(undefined, { month: "long", year: "numeric" });
-  elements.monthLabel.textContent = monthName;
+  elements.monthLabel.textContent = "Calendar";
+  elements.todayBtn.textContent = monthName;
 
   const weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   const start = new Date(visibleMonth);
