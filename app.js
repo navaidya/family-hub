@@ -3,7 +3,7 @@ const LEGACY_STORAGE_KEY = "family-planner-state-v1";
 const LOCAL_PROFILE_KEY = "family-hub-local-profile-v1";
 const FAMILY_ID_KEY = "family-hub-family-id-v1";
 const ADMIN_MEMBER_ID = "me";
-const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
+const MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024;
 const ATTACHMENT_ACCEPT = "image/*,.pdf,.txt,.csv,.doc,.docx,.xls,.xlsx";
 
 const statuses = [
