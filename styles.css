@@ -1159,8 +1159,77 @@ label.attachment-picker,
 }
 
 .wish-row span span {
+  display: block;
   color: var(--muted);
   font-size: 0.9rem;
+}
+
+.dream-link-form {
+  display: grid;
+  grid-template-columns: minmax(150px, 1fr) minmax(120px, 0.45fr);
+  gap: 8px;
+}
+
+.dream-link-form input[name="url"],
+.dream-link-form input[name="notes"],
+.dream-link-form .primary-button {
+  grid-column: 1 / -1;
+}
+
+.dream-link-card {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.dream-link-card a {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 10px;
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.dream-link-card a:hover strong {
+  color: var(--teal-dark);
+}
+
+.dream-link-card svg {
+  width: 20px;
+  height: 20px;
+  color: var(--teal);
+}
+
+.dream-link-card strong,
+.dream-link-card small {
+  display: block;
+}
+
+.dream-link-card small {
+  margin-top: 2px;
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.dream-link-card p {
+  margin: 0;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.compact-action {
+  justify-self: start;
+  min-height: 32px;
+  padding: 0 10px;
+  font-size: 0.82rem;
+}
+
+.danger-text {
+  color: var(--red);
 }
 
 .trip-detail-stack,
@@ -1743,6 +1812,11 @@ label.attachment-picker,
 .comment.wish-comment {
   border-left-color: var(--teal);
   background: #eef8f5;
+}
+
+.comment.dream-note {
+  border-left-color: var(--amber);
+  background: #fff8e8;
 }
 
 .comment p {
@@ -2371,6 +2445,11 @@ label.attachment-picker,
   .form-action-row .primary-button,
   .form-action-row .secondary-button {
     width: 100%;
+  }
+
+  .dream-link-form,
+  .comment-form.dream-note-form {
+    grid-template-columns: 1fr;
   }
 
   .profile-button {

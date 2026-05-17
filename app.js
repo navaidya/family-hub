@@ -15,20 +15,51 @@ const statuses = [
 ];
 
 const wishCategories = [
+  { id: "travel", label: "Travel" },
   { id: "experience", label: "Experience" },
-  { id: "dinner", label: "Dinner" },
-  { id: "hike", label: "Hike" },
-  { id: "vacation", label: "Vacation" },
-  { id: "movie", label: "Movie" },
   { id: "gift", label: "Gift" },
+  { id: "food", label: "Food" },
+  { id: "learning", label: "Learning" },
+  { id: "home", label: "Home" },
+  { id: "family", label: "Family" },
   { id: "other", label: "Other" },
 ];
 
 const wishStatuses = [
-  { id: "wish", label: "Wish" },
+  { id: "idea", label: "Idea" },
+  { id: "researching", label: "Researching" },
   { id: "discussing", label: "Discussing" },
-  { id: "planned", label: "Planned" },
+  { id: "planning", label: "Planning" },
+  { id: "ready", label: "Ready" },
   { id: "done", label: "Done" },
+  { id: "archived", label: "Archived" },
+];
+
+const wishTimeframes = [
+  { id: "someday", label: "Someday" },
+  { id: "this-year", label: "This year" },
+  { id: "next-year", label: "Next year" },
+  { id: "birthday", label: "Birthday" },
+  { id: "holiday", label: "Holiday" },
+  { id: "during-vacation", label: "During vacation" },
+  { id: "custom", label: "Custom" },
+];
+
+const wishPriorities = [
+  { id: "normal", label: "Medium" },
+  { id: "high", label: "High" },
+  { id: "low", label: "Low" },
+];
+
+const wishLinkTypes = [
+  { id: "product", label: "Product" },
+  { id: "hotel", label: "Hotel" },
+  { id: "restaurant", label: "Restaurant" },
+  { id: "video", label: "Video" },
+  { id: "travel", label: "Travel" },
+  { id: "article", label: "Article" },
+  { id: "map", label: "Map" },
+  { id: "other", label: "Other" },
 ];
 
 const googleEmailMemberIds = {};
@@ -36,7 +67,7 @@ const googleEmailMemberIds = {};
 const mainViews = [
   { id: "home", label: "Home", icon: "layout-dashboard" },
   { id: "tasks", label: "Tasks", icon: "list-checks" },
-  { id: "wishlist", label: "Wishlist", icon: "sparkles" },
+  { id: "wishlist", label: "Dreams", icon: "sparkles" },
   { id: "vacation", label: "Vacation", icon: "map" },
   { id: "finance", label: "Finance", icon: "wallet-cards" },
 ];
@@ -96,7 +127,7 @@ let state = loadState();
 let activeStatus = "all";
 let activeMainView = "home";
 let activeTaskMemberId = "all";
-let activeWishMemberId = state.currentMemberId || "me";
+let activeWishMemberId = "all";
 let selectedTaskId = null;
 let selectedTripId = state.trips?.[0]?.id ?? null;
 let selectedWishId = state.wishes?.[0]?.id ?? null;
@@ -289,7 +320,10 @@ const wishForm = {
   owner: document.querySelector("#wishOwner"),
   category: document.querySelector("#wishCategory"),
   status: document.querySelector("#wishStatus"),
-  targetDate: document.querySelector("#wishTargetDate"),
+  timeframe: document.querySelector("#wishTimeframe"),
+  customTimeframe: document.querySelector("#wishCustomTimeframe"),
+  priority: document.querySelector("#wishPriority"),
+  estimatedCost: document.querySelector("#wishEstimatedCost"),
   details: document.querySelector("#wishDetails"),
 };
 
@@ -482,27 +516,60 @@ function normalizeWishes(wishes = []) {
     .filter((wish) => wish && typeof wish === "object")
     .map((wish) => {
       const details = String(wish.details || "").trim();
-      const category = wishCategories.some((item) => item.id === wish.category) ? wish.category : "experience";
-      const status = wishStatuses.some((item) => item.id === wish.status) ? wish.status : "wish";
+      const category = normalizeWishCategory(wish.category);
+      const status = normalizeWishStatus(wish.status);
       return {
         id: wish.id || crypto.randomUUID(),
         title: String(wish.title || deriveWishTitle(details, category)).trim(),
         owner: getKnownMemberId(wish.owner) || "me",
         category,
         status,
+        timeframe: normalizeWishTimeframe(wish.timeframe),
+        customTimeframe: String(wish.customTimeframe || "").trim().slice(0, 80),
+        priority: normalizeWishPriority(wish.priority),
+        estimatedCost: String(wish.estimatedCost || "").trim().slice(0, 40),
         targetDate: wish.targetDate || "",
         details,
+        notes: normalizeWishNotes(wish.notes),
+        links: normalizeWishLinks(wish.links),
+        attachments: normalizeAttachments(wish.attachments),
         comments: normalizeWishComments(wish.comments),
         createdAt: wish.createdAt || new Date().toISOString(),
         updatedAt: wish.updatedAt || wish.createdAt || new Date().toISOString(),
       };
     })
-    .filter((wish) => wish.title || wish.details)
+    .filter((wish) => wish.title || wish.details || wish.notes.length || wish.links.length || wish.attachments.length)
     .sort((a, b) => {
-      if (a.status === "done" && b.status !== "done") return 1;
-      if (a.status !== "done" && b.status === "done") return -1;
+      if (isClosedWish(a) && !isClosedWish(b)) return 1;
+      if (!isClosedWish(a) && isClosedWish(b)) return -1;
       return b.updatedAt.localeCompare(a.updatedAt);
     });
+}
+
+function normalizeWishCategory(category) {
+  const migrated = {
+    dinner: "food",
+    hike: "experience",
+    vacation: "travel",
+    movie: "experience",
+  }[category] || category;
+  return wishCategories.some((item) => item.id === migrated) ? migrated : "experience";
+}
+
+function normalizeWishStatus(status) {
+  const migrated = {
+    wish: "idea",
+    planned: "planning",
+  }[status] || status;
+  return wishStatuses.some((item) => item.id === migrated) ? migrated : "idea";
+}
+
+function normalizeWishTimeframe(timeframe) {
+  return wishTimeframes.some((item) => item.id === timeframe) ? timeframe : "someday";
+}
+
+function normalizeWishPriority(priority) {
+  return wishPriorities.some((item) => item.id === priority) ? priority : "normal";
 }
 
 function normalizeExpenses(expenses = []) {
@@ -564,6 +631,41 @@ function normalizeWishComments(comments = []) {
       text: comment.text.trim(),
     }))
     .filter((comment) => comment.text);
+}
+
+function normalizeWishNotes(notes = []) {
+  if (!Array.isArray(notes)) return [];
+  return notes
+    .filter((note) => note && typeof note.text === "string")
+    .map((note) => ({
+      id: note.id || crypto.randomUUID(),
+      author: getKnownMemberId(note.author) || "me",
+      createdAt: note.createdAt || new Date().toISOString(),
+      text: note.text.trim(),
+    }))
+    .filter((note) => note.text)
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
+function normalizeWishLinks(links = []) {
+  if (!Array.isArray(links)) return [];
+  return links
+    .filter((link) => link && typeof link === "object")
+    .map((link) => ({
+      id: link.id || crypto.randomUUID(),
+      title: String(link.title || "").trim().slice(0, 120),
+      url: String(link.url || "").trim(),
+      type: wishLinkTypes.some((item) => item.id === link.type) ? link.type : "other",
+      notes: String(link.notes || "").trim().slice(0, 360),
+      addedBy: getKnownMemberId(link.addedBy) || "me",
+      addedAt: link.addedAt || new Date().toISOString(),
+    }))
+    .filter((link) => link.url)
+    .map((link) => ({
+      ...link,
+      title: link.title || titleFromUrl(link.url),
+    }))
+    .sort((a, b) => b.addedAt.localeCompare(a.addedAt));
 }
 
 function normalizePhone(phone) {
@@ -643,6 +745,7 @@ function bindEvents() {
   elements.closeWishDialogBtn.addEventListener("click", closeWishDialog);
   elements.wishForm.addEventListener("submit", saveWishFromForm);
   elements.deleteWishBtn.addEventListener("click", deleteCurrentWish);
+  wishForm.timeframe.addEventListener("change", syncWishTimeframeField);
   elements.searchInput.addEventListener("input", renderTasks);
   elements.exportBtn?.addEventListener("click", exportState);
   elements.importInput?.addEventListener("change", importState);
@@ -914,7 +1017,7 @@ function applySignedInProfile(user) {
 
   state.currentMemberId = memberId;
   activeTaskMemberId = memberId;
-  activeWishMemberId = memberId;
+  activeWishMemberId = "all";
   localStorage.setItem(LOCAL_PROFILE_KEY, memberId);
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
 }
@@ -1344,6 +1447,7 @@ function saveState() {
   state.tasks = normalizeTasks(state.tasks);
   state.notes = normalizeNotes(state.notes);
   state.trips = normalizeTrips(state.trips);
+  state.wishes = normalizeWishes(state.wishes);
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   localStorage.setItem(LOCAL_PROFILE_KEY, state.currentMemberId);
   localStorage.removeItem(LEGACY_STORAGE_KEY);
@@ -1367,13 +1471,13 @@ function renderMemberStrip() {
     .map((member) => {
       const assigned = state.tasks.filter((task) => task.assignee === member.id && task.status !== "done").length;
       const requested = state.tasks.filter((task) => task.requester === member.id && task.status !== "done").length;
-      const wishes = state.wishes.filter((wish) => wish.owner === member.id && wish.status !== "done").length;
+      const wishes = state.wishes.filter((wish) => wish.owner === member.id && !isClosedWish(wish)).length;
       return `
         <button class="member-tile ${member.id === state.currentMemberId ? "current" : ""}" type="button" data-login-member="${member.id}">
           <div class="avatar" style="background:${member.color}">${initials(member.name)}</div>
           <div>
             <strong>${escapeHTML(member.name)}</strong>
-            <span>${assigned} assigned · ${requested} asked · ${wishes} wishes</span>
+            <span>${assigned} assigned · ${requested} asked · ${wishes} dreams</span>
           </div>
         </button>
       `;
@@ -1392,7 +1496,7 @@ function renderMainTabs() {
         {
           tasks: state.tasks.filter((task) => task.status !== "done").length,
           home: getHomeAttentionCount(),
-          wishlist: state.wishes.filter((wish) => wish.status !== "done").length,
+          wishlist: state.wishes.filter((wish) => !isClosedWish(wish)).length,
           vacation: state.trips.length,
           finance: getExpensesForFinanceMonth().length,
         }[view.id] ?? 0;
@@ -1433,7 +1537,7 @@ function renderHomeDashboard() {
     .filter((trip) => trip.endDate >= isoToday)
     .sort((a, b) => a.startDate.localeCompare(b.startDate))
     .slice(0, 4);
-  const activeWishes = getSortedWishes().filter((wish) => wish.status !== "done").slice(0, 4);
+  const activeWishes = getSortedWishes().filter((wish) => !isClosedWish(wish)).slice(0, 4);
   const expenses = getExpensesForFinanceMonth();
   const familyName = state.family?.name || "Family Hub";
 
@@ -1449,7 +1553,7 @@ function renderHomeDashboard() {
       <button class="secondary-button" type="button" data-home-view="tasks"><i data-lucide="calendar-days"></i>Open tasks</button>
     </section>
     ${renderHomeListCard("Upcoming tasks", dueSoon.slice(0, 5), (task) => `${task.title} · ${memberName(task.assignee)} · ${formatShortDate(task.dueDate)}`, "tasks")}
-    ${renderHomeListCard("Wishlist", activeWishes, (wish) => `${wish.title} · ${memberName(wish.owner)}`, "wishlist")}
+    ${renderHomeListCard("Dreams", activeWishes, (wish) => `${wish.title} · ${memberName(wish.owner)} · ${wishStatusLabel(wish.status)}`, "wishlist")}
     ${renderHomeListCard("Vacation", upcomingTrips, (trip) => `${trip.title} · ${formatTripRange(trip)}`, "vacation")}
     <section class="home-card">
       <p class="eyebrow">Finance</p>
@@ -1488,17 +1592,17 @@ function getHomeAttentionCount() {
 
 function renderWishes() {
   renderWishTabs();
-  const wishes = getSortedWishes().filter((wish) => wish.owner === activeWishMemberId);
-  const activeMember = getMember(activeWishMemberId) || currentMember();
+  const wishes = getFilteredWishes();
+  const activeMember = activeWishMemberId === "all" ? null : getMember(activeWishMemberId) || currentMember();
 
   if (!wishes.length) {
     selectedWishId = null;
-    elements.wishList.innerHTML = `<div class="empty-state compact">No wishes for ${escapeHTML(activeMember.name)} yet.</div>`;
+    elements.wishList.innerHTML = `<div class="empty-state compact">No dreams ${activeMember ? `for ${escapeHTML(activeMember.name)} ` : ""}yet.</div>`;
     elements.wishDetail.innerHTML = `
       <div class="empty-detail compact-detail">
         <i data-lucide="sparkles"></i>
-        <h2>${escapeHTML(activeMember.name)}'s wishlist</h2>
-        <p>Add dinners, hikes, movies, vacations, gifts, or anything the family should understand.</p>
+        <h2>${activeMember ? `${escapeHTML(activeMember.name)}'s dreams` : "Dreams & ideas"}</h2>
+        <p>Add travel ideas, products, hotels, restaurants, gifts, goals, or anything that can grow into a plan.</p>
       </div>
     `;
     refreshIcons();
@@ -1512,13 +1616,14 @@ function renderWishes() {
   elements.wishList.innerHTML = wishes
     .map((wish) => {
       const owner = getMember(wish.owner);
-      const targetDate = wish.targetDate ? formatShortDate(wish.targetDate) : "No date";
+      const countLine = `${wish.notes.length} notes · ${wish.comments.length} comments · ${wish.links.length} links · ${wish.attachments.length} files`;
       return `
-        <button class="wish-row ${wish.id === selectedWishId ? "selected" : ""} ${wish.status === "done" ? "done" : ""}" type="button" data-wish-id="${escapeAttribute(wish.id)}">
+        <button class="wish-row ${wish.id === selectedWishId ? "selected" : ""} ${isClosedWish(wish) ? "done" : ""}" type="button" data-wish-id="${escapeAttribute(wish.id)}">
           <span class="avatar mini" style="background:${owner?.color || "var(--teal)"}">${initials(owner?.name || "F")}</span>
           <span>
             <strong>${escapeHTML(wish.title)}</strong>
-            <span>${escapeHTML(memberName(wish.owner))} · ${wishCategoryLabel(wish.category)} · ${targetDate}</span>
+            <span>${escapeHTML(memberName(wish.owner))} · ${wishCategoryLabel(wish.category)} · ${wishStatusLabel(wish.status)}</span>
+            <span>${escapeHTML(wishTimeframeLabel(wish))} · ${escapeHTML(wishPriorityLabel(wish.priority))} · ${escapeHTML(countLine)}</span>
           </span>
         </button>
       `;
@@ -1537,19 +1642,23 @@ function renderWishes() {
 }
 
 function renderWishTabs() {
-  if (!getMember(activeWishMemberId)) {
-    activeWishMemberId = state.currentMemberId || state.members[0]?.id || "me";
+  if (activeWishMemberId !== "all" && !getMember(activeWishMemberId)) {
+    activeWishMemberId = "all";
   }
 
-  elements.wishTabs.innerHTML = state.members
+  const allCount = state.wishes.filter((wish) => !isClosedWish(wish)).length;
+  elements.wishTabs.innerHTML = [
+    `<button class="segment ${activeWishMemberId === "all" ? "active" : ""}" type="button" data-wish-member="all">All ${allCount}</button>`,
+    ...state.members
     .map((member) => {
-      const count = state.wishes.filter((wish) => wish.owner === member.id && wish.status !== "done").length;
+      const count = state.wishes.filter((wish) => wish.owner === member.id && !isClosedWish(wish)).length;
       return `
         <button class="segment ${activeWishMemberId === member.id ? "active" : ""}" type="button" data-wish-member="${member.id}">
           ${escapeHTML(member.name)} ${count}
         </button>
       `;
-    })
+    }),
+  ]
     .join("");
 
   elements.wishTabs.querySelectorAll("[data-wish-member]").forEach((button) => {
@@ -1566,6 +1675,20 @@ function renderWishDetail() {
   const wish = getSelectedWish();
   if (!wish) return;
 
+  const notes = wish.notes.length
+    ? wish.notes
+        .map(
+          (note) => `
+            <article class="comment dream-note">
+              <div class="comment-meta">${escapeHTML(memberName(note.author))} · ${formatDateTime(note.createdAt)}</div>
+              <p>${escapeHTML(note.text)}</p>
+              <button class="chip-button compact-action" type="button" data-wish-note-delete="${escapeAttribute(note.id)}">Remove</button>
+            </article>
+          `,
+        )
+        .join("")
+    : `<div class="empty-state compact">No research notes yet.</div>`;
+
   const comments = wish.comments.length
     ? wish.comments
         .map(
@@ -1579,6 +1702,26 @@ function renderWishDetail() {
         .join("")
     : `<div class="empty-state compact">No discussion yet.</div>`;
 
+  const links = wish.links.length
+    ? wish.links
+        .map(
+          (link) => `
+            <article class="dream-link-card">
+              <a href="${escapeAttribute(link.url)}" target="_blank" rel="noreferrer">
+                <i data-lucide="${wishLinkIcon(link.type)}"></i>
+                <span>
+                  <strong>${escapeHTML(link.title)}</strong>
+                  <small>${escapeHTML(wishLinkTypeLabel(link.type))} · Added by ${escapeHTML(memberName(link.addedBy))}</small>
+                </span>
+              </a>
+              ${link.notes ? `<p>${escapeHTML(link.notes)}</p>` : ""}
+              <button class="chip-button compact-action" type="button" data-wish-link-delete="${escapeAttribute(link.id)}">Remove</button>
+            </article>
+          `,
+        )
+        .join("")
+    : `<div class="empty-state compact">No links yet.</div>`;
+
   elements.wishDetail.innerHTML = `
     <div class="wish-detail-stack">
       <div class="detail-top">
@@ -1588,21 +1731,72 @@ function renderWishDetail() {
         </div>
         <div class="detail-actions">
           <button class="secondary-button" type="button" data-wish-edit><i data-lucide="pencil"></i>Edit</button>
-          <button class="chip-button" type="button" data-wish-task><i data-lucide="list-plus"></i>Make task</button>
-          ${wish.status !== "done" ? `<button class="secondary-button" type="button" data-wish-done><i data-lucide="check"></i>Done</button>` : ""}
+          <button class="chip-button" type="button" data-wish-task><i data-lucide="list-plus"></i>Create task</button>
+          ${!isClosedWish(wish) ? `<button class="secondary-button" type="button" data-wish-done><i data-lucide="check"></i>Done</button>` : ""}
         </div>
       </div>
 
       <section class="detail-facts">
-        <div class="fact"><span>For</span><strong>${escapeHTML(memberName(wish.owner))}</strong></div>
+        <div class="fact"><span>Owner</span><strong>${escapeHTML(memberName(wish.owner))}</strong></div>
         <div class="fact"><span>Status</span><strong>${wishStatusLabel(wish.status)}</strong></div>
-        <div class="fact"><span>Target date</span><strong>${wish.targetDate ? formatLongDate(wish.targetDate) : "Open"}</strong></div>
-        <div class="fact"><span>Discussion</span><strong>${wish.comments.length} note${wish.comments.length === 1 ? "" : "s"}</strong></div>
+        <div class="fact"><span>Timeframe</span><strong>${escapeHTML(wishTimeframeLabel(wish))}</strong></div>
+        <div class="fact"><span>Priority</span><strong>${escapeHTML(wishPriorityLabel(wish.priority))}</strong></div>
+        <div class="fact"><span>Estimate</span><strong>${escapeHTML(wish.estimatedCost || "Open")}</strong></div>
+        <div class="fact"><span>Research</span><strong>${wish.notes.length} notes · ${wish.links.length} links · ${wish.attachments.length} files</strong></div>
       </section>
 
       <section class="requirements">
-        <h3>Wish details</h3>
+        <h3>Dream details</h3>
         <p class="task-description">${escapeHTML(wish.details || "No details added.")}</p>
+      </section>
+
+      <section class="conversation">
+        <h3>Research notes</h3>
+        ${notes}
+        <form class="comment-form dream-note-form" data-wish-note-form>
+          <select aria-label="Note author" name="author">
+            ${state.members
+              .map(
+                (member) =>
+                  `<option value="${member.id}" ${member.id === state.currentMemberId ? "selected" : ""}>${escapeHTML(member.name)}</option>`,
+              )
+              .join("")}
+          </select>
+          <input aria-label="Research note" name="text" placeholder="Add research, pricing, pros/cons, or planning notes" required maxlength="360" />
+          <button class="primary-button" type="submit"><i data-lucide="book-plus"></i>Add</button>
+        </form>
+      </section>
+
+      <section class="conversation">
+        <h3>Links</h3>
+        ${links}
+        <form class="dream-link-form" data-wish-link-form>
+          <input name="title" maxlength="120" placeholder="Title, e.g. Xreal glasses on Amazon" />
+          <select name="type" aria-label="Link type">
+            ${wishLinkTypes.map((type) => `<option value="${type.id}">${type.label}</option>`).join("")}
+          </select>
+          <input name="url" type="url" required placeholder="https://..." />
+          <input name="notes" maxlength="300" placeholder="Why this link matters" />
+          <button class="primary-button" type="submit"><i data-lucide="link"></i>Add link</button>
+        </form>
+      </section>
+
+      <section class="conversation">
+        <h3>Attachments</h3>
+        <p class="reminder-meta">Screenshots, PDFs, quotes, product comparisons, or travel ideas. 5 MB per file.</p>
+        ${renderAttachmentList(wish.attachments)}
+        <form class="form-action-row" data-wish-attachment-form>
+          <label class="secondary-button attachment-picker">
+            <i data-lucide="paperclip"></i>
+            Attach files
+            <input name="attachments" type="file" multiple accept="${ATTACHMENT_ACCEPT}" />
+          </label>
+          ${
+            wish.attachments.length
+              ? `<button class="secondary-button danger-text" type="button" data-wish-attachment-remove><i data-lucide="file-x"></i>Remove attachment</button>`
+              : ""
+          }
+        </form>
       </section>
 
       <section class="conversation">
@@ -1617,7 +1811,7 @@ function renderWishDetail() {
               )
               .join("")}
           </select>
-          <input aria-label="Comment" name="text" placeholder="Ask a question or add detail" required maxlength="260" />
+          <input aria-label="Comment" name="text" placeholder="Ask a question or discuss this dream" required maxlength="260" />
           <button class="primary-button" type="submit"><i data-lucide="send"></i>Send</button>
         </form>
       </section>
@@ -1626,6 +1820,17 @@ function renderWishDetail() {
 
   elements.wishDetail.querySelector("[data-wish-edit]").addEventListener("click", () => openWishDialog(wish));
   elements.wishDetail.querySelector("[data-wish-task]").addEventListener("click", () => makeTaskFromWish(wish.id));
+  elements.wishDetail.querySelector("[data-wish-note-form]").addEventListener("submit", addWishNote);
+  elements.wishDetail.querySelectorAll("[data-wish-note-delete]").forEach((button) => {
+    button.addEventListener("click", () => deleteWishNote(button.dataset.wishNoteDelete));
+  });
+  elements.wishDetail.querySelector("[data-wish-link-form]").addEventListener("submit", addWishLink);
+  elements.wishDetail.querySelectorAll("[data-wish-link-delete]").forEach((button) => {
+    button.addEventListener("click", () => deleteWishLink(button.dataset.wishLinkDelete));
+  });
+  elements.wishDetail.querySelector("[data-wish-attachment-form]").addEventListener("submit", addWishAttachments);
+  elements.wishDetail.querySelector("[data-wish-attachment-form] input").addEventListener("change", (event) => addWishAttachments(event));
+  elements.wishDetail.querySelector("[data-wish-attachment-remove]")?.addEventListener("click", removeWishAttachment);
   elements.wishDetail.querySelector("[data-wish-comment-form]").addEventListener("submit", addWishComment);
   elements.wishDetail.querySelector("[data-wish-done]")?.addEventListener("click", () => markWishDone(wish.id));
   refreshIcons();
@@ -3174,6 +3379,12 @@ function populateFormOptions() {
   wishForm.status.innerHTML = wishStatuses
     .map((status) => `<option value="${status.id}">${status.label}</option>`)
     .join("");
+  wishForm.timeframe.innerHTML = wishTimeframes
+    .map((timeframe) => `<option value="${timeframe.id}">${timeframe.label}</option>`)
+    .join("");
+  wishForm.priority.innerHTML = wishPriorities
+    .map((priority) => `<option value="${priority.id}">${priority.label}</option>`)
+    .join("");
 }
 
 function renderTasks() {
@@ -3654,7 +3865,7 @@ function renderAssistantSuggestions() {
     "What is due this week?",
     "Who has overdue tasks?",
     "Show unassigned tasks",
-    "Show wishlist",
+    "Show dreams",
     "Create tasks: Dentist appointment tomorrow",
   ];
 
@@ -3702,7 +3913,7 @@ function answerFamilyQuestion(question) {
   const activeTasks = tasks.filter((task) => task.status !== "done");
 
   if (mentionsHelp(normalized)) {
-    return "I can answer things like: what is due today, what is due this week, who owns a task, what is overdue, what is unassigned, show family wishes, show my notes, create a task from a note, or summarize a family member's tasks.";
+    return "I can answer things like: what is due today, what is due this week, who owns a task, what is overdue, what is unassigned, show family dreams, show my notes, create a task from a note, or summarize a family member's tasks.";
   }
 
   if (mentionsTaskCreationFromNote(normalized)) {
@@ -3715,13 +3926,13 @@ function answerFamilyQuestion(question) {
   }
 
   if (mentionsWish(normalized)) {
-    const wishes = getSortedWishes().filter((wish) => wish.status !== "done");
+    const wishes = getSortedWishes().filter((wish) => !isClosedWish(wish));
     if (person) {
-      return formatWishAnswer(`${person.name}'s wishes`, wishes.filter((wish) => wish.owner === person.id));
+      return formatWishAnswer(`${person.name}'s dreams`, wishes.filter((wish) => wish.owner === person.id));
     }
 
     const matchingWishes = searchWishes(normalized, wishes);
-    return formatWishAnswer("Wishlist", matchingWishes.length ? matchingWishes : wishes);
+    return formatWishAnswer("Dreams", matchingWishes.length ? matchingWishes : wishes);
   }
 
   if (mentionsNotebook(normalized)) {
@@ -3828,8 +4039,12 @@ function searchWishes(text, wishes) {
       wish.details,
       wishCategoryLabel(wish.category),
       wishStatusLabel(wish.status),
+      wishTimeframeLabel(wish),
+      wishPriorityLabel(wish.priority),
+      wish.estimatedCost,
+      wish.notes.map((note) => note.text).join(" "),
+      wish.links.map((link) => `${link.title} ${link.url} ${link.notes} ${wishLinkTypeLabel(link.type)}`).join(" "),
       memberName(wish.owner),
-      wish.targetDate ? formatLongDate(wish.targetDate) : "",
     ]
       .join(" ")
       .toLowerCase();
@@ -3855,8 +4070,8 @@ function formatWishLines(wishes) {
   return wishes
     .slice(0, 8)
     .map((wish) => {
-      const target = wish.targetDate ? `, target ${formatLongDate(wish.targetDate)}` : "";
-      return `- ${wish.title}: ${memberName(wish.owner)}, ${wishCategoryLabel(wish.category)}, ${wishStatusLabel(wish.status)}${target}`;
+      const research = wish.notes.length || wish.links.length ? `, ${wish.notes.length} notes, ${wish.links.length} links` : "";
+      return `- ${wish.title}: ${memberName(wish.owner)}, ${wishCategoryLabel(wish.category)}, ${wishStatusLabel(wish.status)}, ${wishTimeframeLabel(wish)}${research}`;
     })
     .join("\n");
 }
@@ -4332,16 +4547,20 @@ function closeTripDialog() {
 }
 
 function openWishDialog(wish = null) {
-  elements.wishDialogTitle.textContent = wish ? "Edit wish" : "New wish";
+  elements.wishDialogTitle.textContent = wish ? "Edit dream" : "New dream";
   elements.deleteWishBtn.style.visibility = wish ? "visible" : "hidden";
 
   wishForm.id.value = wish?.id ?? "";
   wishForm.title.value = wish?.title ?? "";
-  wishForm.owner.value = wish?.owner ?? activeWishMemberId ?? state.currentMemberId;
+  wishForm.owner.value = wish?.owner ?? (activeWishMemberId !== "all" ? activeWishMemberId : state.currentMemberId) ?? state.currentMemberId;
   wishForm.category.value = wish?.category ?? "experience";
-  wishForm.status.value = wish?.status ?? "wish";
-  wishForm.targetDate.value = wish?.targetDate ?? "";
+  wishForm.status.value = wish?.status ?? "idea";
+  wishForm.timeframe.value = wish?.timeframe ?? "someday";
+  wishForm.customTimeframe.value = wish?.customTimeframe ?? "";
+  wishForm.priority.value = wish?.priority ?? "normal";
+  wishForm.estimatedCost.value = wish?.estimatedCost ?? "";
   wishForm.details.value = wish?.details ?? "";
+  syncWishTimeframeField();
 
   elements.wishDialog.showModal();
   wishForm.details.focus();
@@ -4351,6 +4570,12 @@ function openWishDialog(wish = null) {
 function closeWishDialog() {
   elements.wishDialog.close();
   elements.wishForm.reset();
+}
+
+function syncWishTimeframeField() {
+  const isCustom = wishForm.timeframe.value === "custom";
+  wishForm.customTimeframe.disabled = !isCustom;
+  wishForm.customTimeframe.closest("label").style.opacity = isCustom ? "1" : "0.55";
 }
 
 function saveWishFromForm(event) {
@@ -4366,8 +4591,15 @@ function saveWishFromForm(event) {
     owner: wishForm.owner.value,
     category,
     status: wishForm.status.value,
-    targetDate: wishForm.targetDate.value,
+    timeframe: wishForm.timeframe.value,
+    customTimeframe: wishForm.customTimeframe.value.trim(),
+    priority: wishForm.priority.value,
+    estimatedCost: wishForm.estimatedCost.value.trim(),
+    targetDate: existing?.targetDate ?? "",
     details,
+    notes: existing?.notes ?? [],
+    links: existing?.links ?? [],
+    attachments: existing?.attachments ?? [],
     comments: existing?.comments ?? [],
     createdAt: existing?.createdAt ?? now,
     updatedAt: now,
@@ -4397,6 +4629,7 @@ function deleteCurrentWish() {
   state.wishes = state.wishes.filter((item) => item.id !== id);
   selectedWishId = state.wishes[0]?.id ?? null;
   saveState();
+  deleteAttachmentFiles(wish.attachments);
   closeWishDialog();
   render();
 }
@@ -4533,9 +4766,128 @@ function addWishComment(event) {
     createdAt: new Date().toISOString(),
     text,
   });
-  wish.status = wish.status === "wish" ? "discussing" : wish.status;
+  wish.status = wish.status === "idea" ? "discussing" : wish.status;
   wish.updatedAt = new Date().toISOString();
   saveState();
+  renderWishes();
+}
+
+function addWishNote(event) {
+  event.preventDefault();
+  const wish = getSelectedWish();
+  if (!wish) return;
+
+  const data = new FormData(event.currentTarget);
+  const text = String(data.get("text") || "").trim();
+  if (!text) return;
+
+  wish.notes.unshift({
+    id: crypto.randomUUID(),
+    author: String(data.get("author")),
+    createdAt: new Date().toISOString(),
+    text,
+  });
+  if (wish.status === "idea") wish.status = "researching";
+  wish.updatedAt = new Date().toISOString();
+  saveState();
+  renderWishes();
+}
+
+function deleteWishNote(noteId) {
+  const wish = getSelectedWish();
+  if (!wish) return;
+  const note = wish.notes.find((item) => item.id === noteId);
+  if (!note) return;
+  const confirmed = window.confirm("Remove this research note?");
+  if (!confirmed) return;
+
+  wish.notes = wish.notes.filter((item) => item.id !== noteId);
+  wish.updatedAt = new Date().toISOString();
+  saveState();
+  renderWishes();
+}
+
+function addWishLink(event) {
+  event.preventDefault();
+  const wish = getSelectedWish();
+  if (!wish) return;
+
+  const data = new FormData(event.currentTarget);
+  const url = String(data.get("url") || "").trim();
+  if (!url) return;
+
+  wish.links.unshift({
+    id: crypto.randomUUID(),
+    title: String(data.get("title") || "").trim() || titleFromUrl(url),
+    url,
+    type: String(data.get("type") || "other"),
+    notes: String(data.get("notes") || "").trim(),
+    addedBy: state.currentMemberId,
+    addedAt: new Date().toISOString(),
+  });
+  if (wish.status === "idea") wish.status = "researching";
+  wish.updatedAt = new Date().toISOString();
+  saveState();
+  renderWishes();
+}
+
+function deleteWishLink(linkId) {
+  const wish = getSelectedWish();
+  if (!wish) return;
+  const link = wish.links.find((item) => item.id === linkId);
+  if (!link) return;
+  const confirmed = window.confirm(`Remove "${link.title}"?`);
+  if (!confirmed) return;
+
+  wish.links = wish.links.filter((item) => item.id !== linkId);
+  wish.updatedAt = new Date().toISOString();
+  saveState();
+  renderWishes();
+}
+
+async function addWishAttachments(event) {
+  event.preventDefault?.();
+  const wish = getSelectedWish();
+  if (!wish) return;
+
+  const input = event.currentTarget?.matches?.("input[type='file']")
+    ? event.currentTarget
+    : event.currentTarget?.querySelector?.("input[type='file']");
+  const files = input?.files || [];
+  if (!files.length) return;
+
+  try {
+    const attachments = await uploadAttachments(files, `dreams/${wish.id}`);
+    if (!attachments.length) return;
+    wish.attachments = [...normalizeAttachments(wish.attachments), ...attachments];
+    if (wish.status === "idea") wish.status = "researching";
+    wish.updatedAt = new Date().toISOString();
+    saveState();
+    renderWishes();
+  } catch (error) {
+    console.error(error);
+    window.alert(error.userFacing ? error.message : "Attachment upload failed. The dream was not updated.");
+  } finally {
+    if (input) input.value = "";
+  }
+}
+
+function removeWishAttachment() {
+  const wish = getSelectedWish();
+  if (!wish?.attachments?.length) return;
+  const attachmentNames = wish.attachments.map((attachment, index) => `${index + 1}. ${attachment.name}`).join("\n");
+  const choice = window.prompt(`Which attachment should be removed?\n\n${attachmentNames}`, "1");
+  if (choice === null) return;
+  const index = Number(choice) - 1;
+  const attachment = wish.attachments[index];
+  if (!attachment) return;
+  const confirmed = window.confirm(`Remove "${attachment.name}" from this dream?`);
+  if (!confirmed) return;
+
+  wish.attachments = wish.attachments.filter((item) => item.id !== attachment.id);
+  wish.updatedAt = new Date().toISOString();
+  saveState();
+  deleteAttachmentFiles([attachment]);
   renderWishes();
 }
 
@@ -4550,17 +4902,17 @@ function makeTaskFromWish(wishId) {
     type: wish.category === "gift" ? "ask" : "todo",
     status: "discussion",
     requester: wish.owner,
-    assignee: "",
-    dueDate: wish.targetDate || addDays(isoToday, 7),
+    assignee: wish.owner,
+    dueDate: addDays(isoToday, 7),
     recurrence: "none",
-    priority: "normal",
-    description: `Created from Wishlist.\n\nCategory: ${wishCategoryLabel(wish.category)}\nWish details:\n${wish.details || "No details added."}`,
+    priority: wish.priority === "high" ? "high" : "normal",
+    description: `Created from Dream.\n\nType: ${wishCategoryLabel(wish.category)}\nTimeframe: ${wishTimeframeLabel(wish)}\nEstimate: ${wish.estimatedCost || "Open"}\n\nDream details:\n${wish.details || "No details added."}`,
     comments: [
       {
         id: crypto.randomUUID(),
         author: state.currentMemberId,
         createdAt: now,
-        text: "Created from a Wishlist item.",
+        text: "Created from a Dream.",
       },
     ],
     createdAt: now,
@@ -4568,7 +4920,7 @@ function makeTaskFromWish(wishId) {
   };
 
   state.tasks.unshift(task);
-  wish.status = "planned";
+  wish.status = "planning";
   wish.updatedAt = now;
   activeMainView = "tasks";
   selectedTaskId = task.id;
@@ -4876,10 +5228,10 @@ function scrollToVacationTarget(target, targetId) {
 
 function getWishEventsForDate(dateString) {
   return state.wishes
-    .filter((wish) => wish.targetDate === dateString && wish.status !== "done")
+    .filter((wish) => wish.targetDate === dateString && !isClosedWish(wish))
     .map((wish) => ({
       wishId: wish.id,
-      title: `Wish: ${wish.title}`,
+      title: `Dream: ${wish.title}`,
     }));
 }
 
@@ -4936,11 +5288,8 @@ function getSortedTasks() {
 
 function getSortedWishes() {
   return [...state.wishes].sort((a, b) => {
-    if (a.status === "done" && b.status !== "done") return 1;
-    if (a.status !== "done" && b.status === "done") return -1;
-    if (a.targetDate && b.targetDate && a.targetDate !== b.targetDate) return a.targetDate.localeCompare(b.targetDate);
-    if (a.targetDate && !b.targetDate) return -1;
-    if (!a.targetDate && b.targetDate) return 1;
+    if (isClosedWish(a) && !isClosedWish(b)) return 1;
+    if (!isClosedWish(a) && isClosedWish(b)) return -1;
     return b.updatedAt.localeCompare(a.updatedAt);
   });
 }
@@ -5180,11 +5529,56 @@ function statusLabel(status) {
 }
 
 function wishCategoryLabel(category) {
-  return wishCategories.find((item) => item.id === category)?.label ?? "Wish";
+  return wishCategories.find((item) => item.id === category)?.label ?? "Dream";
 }
 
 function wishStatusLabel(status) {
-  return wishStatuses.find((item) => item.id === status)?.label ?? "Wish";
+  return wishStatuses.find((item) => item.id === status)?.label ?? "Idea";
+}
+
+function wishTimeframeLabel(wish) {
+  if (wish.timeframe === "custom" && wish.customTimeframe) return wish.customTimeframe;
+  return wishTimeframes.find((item) => item.id === wish.timeframe)?.label ?? "Someday";
+}
+
+function wishPriorityLabel(priority) {
+  return wishPriorities.find((item) => item.id === priority)?.label ?? "Medium";
+}
+
+function wishLinkTypeLabel(type) {
+  return wishLinkTypes.find((item) => item.id === type)?.label ?? "Other";
+}
+
+function wishLinkIcon(type) {
+  const icons = {
+    product: "shopping-bag",
+    hotel: "bed",
+    restaurant: "utensils",
+    video: "play-circle",
+    travel: "map",
+    article: "newspaper",
+    map: "map-pin",
+    other: "link",
+  };
+  return icons[type] || "link";
+}
+
+function isClosedWish(wish) {
+  return wish.status === "done" || wish.status === "archived";
+}
+
+function getFilteredWishes() {
+  const wishes = getSortedWishes();
+  return activeWishMemberId === "all" ? wishes : wishes.filter((wish) => wish.owner === activeWishMemberId);
+}
+
+function titleFromUrl(url) {
+  try {
+    const parsed = new URL(url);
+    return parsed.hostname.replace(/^www\./, "");
+  } catch {
+    return "Research link";
+  }
 }
 
 function deriveWishTitle(details, category = "experience") {
@@ -5200,7 +5594,7 @@ function deriveWishTitle(details, category = "experience") {
   if (cleaned) {
     return cleaned.length > 72 ? `${cleaned.slice(0, 69).trim()}...` : cleaned;
   }
-  return `${wishCategoryLabel(category)} wish`;
+  return `${wishCategoryLabel(category)} dream`;
 }
 
 function nextStatusLabel(status) {

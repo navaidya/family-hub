@@ -1,6 +1,6 @@
 # Family Hub
 
-A browser-based family hub with tasks, wishlists, vacation planning, finance tracking, notebooks, dashboard summaries, and reminder composition.
+A browser-based family hub with tasks, Dreams, vacation planning, finance tracking, notebooks, dashboard summaries, and reminder composition.
 
 Open `index.html` in a browser for local testing, or use the GitHub Pages URL for the hosted app. Family data is saved locally until Firebase sync is configured and a Google account signs in.
 

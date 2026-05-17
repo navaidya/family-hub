@@ -34,7 +34,7 @@
             </div>
           </div>
           <p class="auth-lede">
-            One shared place for tasks, wishes, vacation plans, finance reminders, notebooks, and family conversations.
+            One shared place for tasks, dreams, vacation plans, finance reminders, notebooks, and family conversations.
           </p>
           <div class="auth-feature-grid" aria-label="Family Hub sections">
             <div class="auth-feature">
@@ -44,8 +44,8 @@
             </div>
             <div class="auth-feature">
               <i data-lucide="sparkles"></i>
-              <span>Wishlist</span>
-              <small>Ideas, wishes, and discussion</small>
+              <span>Dreams</span>
+              <small>Ideas, research, and discussion</small>
             </div>
             <div class="auth-feature">
               <i data-lucide="map"></i>
@@ -118,18 +118,18 @@
         <div class="home-grid" id="homeDashboard"></div>
       </section>
 
-      <section class="wishlist-panel tab-view" id="wishlistView" aria-label="Wishlist">
+      <section class="wishlist-panel tab-view" id="wishlistView" aria-label="Dreams">
         <div class="panel-heading">
           <div>
-            <p class="eyebrow">Dreams and wishes</p>
-            <h2>Wishlist</h2>
+            <p class="eyebrow">Dreams & ideas</p>
+            <h2>Dreams</h2>
           </div>
           <button class="primary-button" id="newWishBtn" type="button">
             <i data-lucide="sparkles"></i>
-            New wish
+            New dream
           </button>
         </div>
-        <nav class="segmented-control member-filter-tabs" id="wishTabs" aria-label="Wishlist member filters"></nav>
+        <nav class="segmented-control member-filter-tabs" id="wishTabs" aria-label="Dream member filters"></nav>
         <div class="wishlist-grid">
           <div class="wish-list" id="wishList"></div>
           <div class="wish-detail" id="wishDetail"></div>
@@ -460,8 +460,8 @@
       <form id="wishForm" method="dialog">
         <div class="dialog-heading">
           <div>
-            <p class="eyebrow">Wishlist</p>
-            <h2 id="wishDialogTitle">New wish</h2>
+            <p class="eyebrow">Dreams</p>
+            <h2 id="wishDialogTitle">New dream</h2>
           </div>
           <button class="icon-button" id="closeWishDialogBtn" value="cancel" type="button" title="Close" aria-label="Close">
             <i data-lucide="x">×</i>
@@ -482,7 +482,7 @@
           </label>
 
           <label>
-            Category
+            Type
             <select id="wishCategory" name="category"></select>
           </label>
 
@@ -492,14 +492,31 @@
           </label>
 
           <label>
-            Target date
-            <input id="wishTargetDate" name="targetDate" type="date" />
+            Timeframe
+            <select id="wishTimeframe" name="timeframe"></select>
+          </label>
+
+          <label>
+            Priority
+            <select id="wishPriority" name="priority"></select>
+          </label>
+        </div>
+
+        <div class="form-grid">
+          <label>
+            Custom timeframe
+            <input id="wishCustomTimeframe" maxlength="60" placeholder="Optional, e.g. summer break" />
+          </label>
+
+          <label>
+            Estimated cost
+            <input id="wishEstimatedCost" inputmode="decimal" maxlength="20" placeholder="Optional, e.g. $500" />
           </label>
         </div>
 
         <label>
           Details
-          <textarea id="wishDetails" name="details" rows="5" required placeholder="What do you want, why, budget, location, links, timing, or anything the family should understand"></textarea>
+          <textarea id="wishDetails" name="details" rows="5" required placeholder="What is the dream, why it matters, early research, budget thoughts, links, or anything the family should understand"></textarea>
         </label>
 
         <div class="dialog-actions">
@@ -509,7 +526,7 @@
           </button>
           <button class="primary-button" type="submit">
             <i data-lucide="save"></i>
-            Save wish
+            Save dream
           </button>
         </div>
       </form>
