@@ -166,16 +166,6 @@
             </form>
           </section>
 
-          <section class="finance-card-panel">
-            <div class="panel-heading compact">
-              <div>
-                <p class="eyebrow">Credit cards</p>
-                <h2>Cards and usage</h2>
-              </div>
-            </div>
-            <div class="credit-card-list" id="financeCreditCardList"></div>
-          </section>
-
           <section class="finance-calendar-panel">
             <div class="panel-heading compact">
               <div>
@@ -195,16 +185,28 @@
             <div class="calendar finance-calendar" id="financeCalendarGrid"></div>
           </section>
 
-          <section class="finance-expense-panel">
-            <div class="panel-heading compact">
+          <details class="finance-card-panel finance-disclosure" id="financeCardsDisclosure">
+            <summary class="finance-disclosure-summary">
+              <div>
+                <p class="eyebrow">Credit cards</p>
+                <h2>Cards and usage</h2>
+              </div>
+              <i data-lucide="chevron-down"></i>
+            </summary>
+            <div class="credit-card-list" id="financeCreditCardList"></div>
+          </details>
+
+          <details class="finance-expense-panel finance-disclosure" id="financeExpensesDisclosure">
+            <summary class="finance-disclosure-summary">
               <div>
                 <p class="eyebrow">Extracted bills</p>
                 <h2>Expenses</h2>
               </div>
-            </div>
+              <i data-lucide="chevron-down"></i>
+            </summary>
             <p class="form-error" id="financeProcessStatus"></p>
             <div class="finance-expense-list" id="financeExpenseList"></div>
-          </section>
+          </details>
         </div>
       </section>
 

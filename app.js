@@ -207,6 +207,8 @@ const elements = {
   financeThisMonthBtn: document.querySelector("#financeThisMonthBtn"),
   financeNextMonthBtn: document.querySelector("#financeNextMonthBtn"),
   financeCalendarGrid: document.querySelector("#financeCalendarGrid"),
+  financeCardsDisclosure: document.querySelector("#financeCardsDisclosure"),
+  financeExpensesDisclosure: document.querySelector("#financeExpensesDisclosure"),
   financeProcessStatus: document.querySelector("#financeProcessStatus"),
   financeExpenseList: document.querySelector("#financeExpenseList"),
   financeCreditCardList: document.querySelector("#financeCreditCardList"),
@@ -2246,12 +2248,14 @@ function renderFinanceCalendar() {
 
   elements.financeCalendarGrid.querySelectorAll("[data-finance-expense]").forEach((button) => {
     button.addEventListener("click", () => {
+      elements.financeExpensesDisclosure.open = true;
       const row = elements.financeExpenseList.querySelector(`[data-expense-card="${CSS.escape(button.dataset.financeExpense)}"]`);
       row?.scrollIntoView({ behavior: "smooth", block: "center" });
     });
   });
   elements.financeCalendarGrid.querySelectorAll("[data-finance-card]").forEach((button) => {
     button.addEventListener("click", () => {
+      elements.financeCardsDisclosure.open = true;
       const row = elements.financeCreditCardList.querySelector(`[data-credit-card-row="${CSS.escape(button.dataset.financeCard)}"]`);
       row?.scrollIntoView({ behavior: "smooth", block: "center" });
     });
@@ -2347,6 +2351,7 @@ function addManualFinanceExpense(event) {
   saveState();
   elements.financeManualForm.reset();
   elements.financeManualDate.value = date;
+  elements.financeExpensesDisclosure.open = true;
   elements.financeProcessStatus.textContent = `Added ${title} for ${formatMoney(amount)}.`;
   renderFinance();
   renderMainTabs();
@@ -2417,6 +2422,7 @@ async function processFinanceFiles(fileList) {
   const files = [...(fileList || [])];
   if (!files.length) return;
 
+  elements.financeExpensesDisclosure.open = true;
   elements.financeProcessStatus.textContent = `Processing ${files.length} file${files.length === 1 ? "" : "s"}...`;
   elements.financeUploadBtn.disabled = true;
 

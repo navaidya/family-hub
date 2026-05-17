@@ -560,6 +560,45 @@ label.import-button {
   grid-column: 1 / -1;
 }
 
+.finance-disclosure {
+  padding: 0;
+}
+
+.finance-disclosure-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.finance-disclosure-summary::-webkit-details-marker {
+  display: none;
+}
+
+.finance-disclosure-summary h2,
+.finance-disclosure-summary p {
+  margin: 0;
+}
+
+.finance-disclosure-summary svg {
+  flex: 0 0 auto;
+  color: var(--muted);
+  transition: transform 0.16s ease;
+}
+
+.finance-disclosure[open] .finance-disclosure-summary svg {
+  transform: rotate(180deg);
+}
+
+.finance-disclosure .credit-card-list,
+.finance-disclosure .finance-expense-list,
+.finance-disclosure .form-error {
+  margin: 0 14px 14px;
+}
+
 .finance-manual-form {
   display: grid;
   grid-template-columns: minmax(180px, 1.2fr) minmax(120px, 0.5fr) minmax(140px, 0.55fr);
