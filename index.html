@@ -96,6 +96,24 @@
           <div class="trip-list" id="tripList" role="tablist" aria-label="Trips"></div>
           <div class="trip-detail trip-page" id="tripDetail"></div>
         </div>
+        <section class="calendar-panel vacation-calendar-panel" aria-label="Vacation calendar">
+          <div class="panel-heading compact">
+            <div>
+              <p class="eyebrow">Vacation calendar</p>
+              <h2 id="vacationMonthLabel">Calendar</h2>
+            </div>
+            <div class="calendar-controls">
+              <button class="icon-button" id="vacationPrevMonthBtn" type="button" title="Previous month" aria-label="Previous vacation month">
+                <i data-lucide="chevron-left">‹</i>
+              </button>
+              <button class="secondary-button" id="vacationTripMonthBtn" type="button">Trip month</button>
+              <button class="icon-button" id="vacationNextMonthBtn" type="button" title="Next month" aria-label="Next vacation month">
+                <i data-lucide="chevron-right">›</i>
+              </button>
+            </div>
+          </div>
+          <div class="calendar vacation-calendar" id="vacationCalendarGrid"></div>
+        </section>
       </section>
 
       <section class="finance-panel tab-view" id="financeView" aria-label="Finance budgeting">

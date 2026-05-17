@@ -460,6 +460,10 @@ label.import-button {
   gap: 14px;
 }
 
+.vacation-calendar-panel {
+  margin-top: 14px;
+}
+
 .finance-grid {
   display: grid;
   grid-template-columns: minmax(280px, 0.42fr) minmax(0, 1fr);
@@ -576,6 +580,26 @@ label.import-button {
 .finance-calendar .calendar-task.finance {
   color: #135e46;
   background: #dff4ea;
+}
+
+.vacation-calendar .calendar-task.vacation-trip {
+  color: #135e46;
+  background: #dff4ea;
+}
+
+.vacation-calendar .calendar-task.vacation-day {
+  color: #38417e;
+  background: #e5e8ff;
+}
+
+.vacation-calendar .calendar-task.vacation-hotel {
+  color: #7a2f1f;
+  background: #fff1cf;
+}
+
+.vacation-calendar .calendar-task.vacation-stop {
+  color: #334155;
+  background: #eef3f7;
 }
 
 .finance-expense-list {

@@ -157,6 +157,7 @@ let selectedTaskId = null;
 let selectedTripId = state.trips?.[0]?.id ?? null;
 let selectedWishId = state.wishes?.[0]?.id ?? null;
 let visibleMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+let visibleVacationMonth = monthForDate(state.trips?.[0]?.startDate) || new Date(today.getFullYear(), today.getMonth(), 1);
 let visibleFinanceMonth = new Date(today.getFullYear(), today.getMonth(), 1);
 let pendingLoginMemberId = state.currentMemberId;
 let cloudState = createCloudState();
@@ -181,6 +182,11 @@ const elements = {
   newTripBtn: document.querySelector("#newTripBtn"),
   tripList: document.querySelector("#tripList"),
   tripDetail: document.querySelector("#tripDetail"),
+  vacationMonthLabel: document.querySelector("#vacationMonthLabel"),
+  vacationPrevMonthBtn: document.querySelector("#vacationPrevMonthBtn"),
+  vacationTripMonthBtn: document.querySelector("#vacationTripMonthBtn"),
+  vacationNextMonthBtn: document.querySelector("#vacationNextMonthBtn"),
+  vacationCalendarGrid: document.querySelector("#vacationCalendarGrid"),
   financeUploadBtn: document.querySelector("#financeUploadBtn"),
   financeFileInput: document.querySelector("#financeFileInput"),
   financeDropZone: document.querySelector("#financeDropZone"),
@@ -638,6 +644,13 @@ function bindEvents() {
   elements.newTaskBtn.addEventListener("click", () => openTaskDialog());
   elements.newWishBtn.addEventListener("click", () => openWishDialog());
   elements.newTripBtn.addEventListener("click", () => openTripDialog());
+  elements.vacationPrevMonthBtn.addEventListener("click", () => changeVacationMonth(-1));
+  elements.vacationNextMonthBtn.addEventListener("click", () => changeVacationMonth(1));
+  elements.vacationTripMonthBtn.addEventListener("click", () => {
+    const trip = getSelectedTrip();
+    visibleVacationMonth = monthForDate(trip?.startDate) || new Date(today.getFullYear(), today.getMonth(), 1);
+    renderVacationCalendar();
+  });
   elements.financeUploadBtn.addEventListener("click", () => elements.financeFileInput.click());
   elements.financeFileInput.addEventListener("change", (event) => processFinanceFiles(event.target.files));
   elements.financeDropZone.addEventListener("click", () => elements.financeFileInput.click());
@@ -872,6 +885,7 @@ function applyRemoteFamilyData(data = {}) {
 
   if (!state.trips.some((trip) => trip.id === selectedTripId)) {
     selectedTripId = state.trips[0]?.id ?? null;
+    visibleVacationMonth = monthForDate(getSelectedTrip()?.startDate) || visibleVacationMonth;
   }
 
   if (!state.wishes.some((wish) => wish.id === selectedWishId)) {
@@ -1313,12 +1327,14 @@ function renderTrips() {
         <p>Add a trip, then build hotels, food stops, sightseeing, and day-by-day maps.</p>
       </div>
     `;
+    renderVacationCalendar();
     refreshIcons();
     return;
   }
 
   if (!getSelectedTrip()) {
     selectedTripId = state.trips[0].id;
+    visibleVacationMonth = monthForDate(state.trips[0].startDate) || visibleVacationMonth;
   }
 
   elements.tripList.innerHTML = state.trips
@@ -1343,11 +1359,13 @@ function renderTrips() {
   elements.tripList.querySelectorAll("[data-trip-id]").forEach((button) => {
     button.addEventListener("click", () => {
       selectedTripId = button.dataset.tripId;
+      visibleVacationMonth = monthForDate(getSelectedTrip()?.startDate) || visibleVacationMonth;
       renderTrips();
     });
   });
 
   renderTripDetail();
+  renderVacationCalendar();
 }
 
 function renderTripDetail() {
@@ -1434,9 +1452,60 @@ function renderTripDetail() {
   refreshIcons();
 }
 
+function renderVacationCalendar() {
+  const trip = getSelectedTrip();
+  const monthName = visibleVacationMonth.toLocaleDateString(undefined, { month: "long", year: "numeric" });
+  elements.vacationMonthLabel.textContent = trip ? `${trip.title} · ${monthName}` : monthName;
+
+  const weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const start = new Date(visibleVacationMonth);
+  start.setDate(1 - start.getDay());
+
+  const days = [];
+  for (let i = 0; i < 42; i += 1) {
+    const date = new Date(start);
+    date.setDate(start.getDate() + i);
+    days.push(date);
+  }
+
+  elements.vacationCalendarGrid.innerHTML = `
+    ${weekdays.map((day) => `<div class="calendar-weekday">${day}</div>`).join("")}
+    ${days
+      .map((date) => {
+        const iso = toISODate(date);
+        const events = trip ? getVacationCalendarEventsForDate(trip, iso) : [];
+        const outside = date.getMonth() !== visibleVacationMonth.getMonth();
+        const isToday = iso === isoToday;
+        return `
+          <div class="calendar-day ${outside ? "outside" : ""} ${isToday ? "today" : ""}">
+            <span class="day-number">${date.getDate()}</span>
+            <div class="calendar-items">
+              ${events
+                .map(
+                  (event) => `
+                    <button class="calendar-task vacation-${event.kind}" type="button" data-vacation-target="${escapeAttribute(event.target)}" data-vacation-target-id="${escapeAttribute(event.targetId)}" title="${escapeAttribute(event.title)}">
+                      <strong>${escapeHTML(event.title)}</strong>
+                      ${event.meta ? `<span>${escapeHTML(event.meta)}</span>` : ""}
+                    </button>
+                  `,
+                )
+                .join("")}
+            </div>
+          </div>
+        `;
+      })
+      .join("")}
+  `;
+
+  elements.vacationCalendarGrid.querySelectorAll("[data-vacation-target]").forEach((button) => {
+    button.addEventListener("click", () => scrollToVacationTarget(button.dataset.vacationTarget, button.dataset.vacationTargetId));
+  });
+  refreshIcons();
+}
+
 function renderHotelCard(hotel) {
   return `
-    <article class="hotel-card">
+    <article class="hotel-card" data-hotel-card="${escapeAttribute(hotel.id)}">
       <div>
         <strong>${escapeHTML(hotel.name || "Hotel stay")}</strong>
         <p>${escapeHTML(hotel.address || "No address added.")}</p>
@@ -1507,7 +1576,7 @@ function renderTripDayCard(trip, day) {
     ? day.stops.map((stop) => renderTripStop(trip, day, stop)).join("")
     : `<div class="empty-state compact">No stops yet.</div>`;
   return `
-    <article class="trip-day-card" data-day-drop="${escapeAttribute(day.id)}">
+    <article class="trip-day-card" data-trip-day-card="${escapeAttribute(day.id)}" data-day-drop="${escapeAttribute(day.id)}">
       <div class="trip-day-heading">
         <div>
           <p class="eyebrow">${formatLongDate(day.date)}</p>
@@ -3794,6 +3863,7 @@ function saveTripFromForm(event) {
 
   state.trips.sort((a, b) => a.startDate.localeCompare(b.startDate));
   selectedTripId = id;
+  visibleVacationMonth = monthForDate(trip.startDate) || visibleVacationMonth;
   saveState();
   closeTripDialog();
   renderTrips();
@@ -3809,6 +3879,7 @@ function deleteCurrentTrip() {
 
   state.trips = state.trips.filter((item) => item.id !== id);
   selectedTripId = state.trips[0]?.id ?? null;
+  visibleVacationMonth = monthForDate(getSelectedTrip()?.startDate) || new Date(today.getFullYear(), today.getMonth(), 1);
   saveState();
   closeTripDialog();
   renderTrips();
@@ -4118,6 +4189,11 @@ function changeMonth(delta) {
   renderCalendar();
 }
 
+function changeVacationMonth(delta) {
+  visibleVacationMonth = new Date(visibleVacationMonth.getFullYear(), visibleVacationMonth.getMonth() + delta, 1);
+  renderVacationCalendar();
+}
+
 function getSelectedTask() {
   return state.tasks.find((task) => task.id === selectedTaskId) ?? null;
 }
@@ -4146,6 +4222,62 @@ function getTripEventsForDate(dateString) {
       });
     return events;
   });
+}
+
+function getVacationCalendarEventsForDate(trip, dateString) {
+  const events = [];
+
+  if (dateString === trip.startDate) {
+    events.push({ kind: "trip", target: "trip", targetId: trip.id, title: `Start: ${trip.title}`, meta: trip.destination });
+  }
+  if (dateString === trip.endDate && trip.endDate !== trip.startDate) {
+    events.push({ kind: "trip", target: "trip", targetId: trip.id, title: `End: ${trip.title}`, meta: trip.destination });
+  }
+
+  trip.hotels.forEach((hotel) => {
+    if (dateString === hotel.checkIn) {
+      events.push({ kind: "hotel", target: "hotel", targetId: hotel.id, title: `Check in: ${hotel.name}`, meta: hotel.address });
+    } else if (dateString === hotel.checkOut) {
+      events.push({ kind: "hotel", target: "hotel", targetId: hotel.id, title: `Check out: ${hotel.name}`, meta: hotel.address });
+    } else if (hotel.checkIn && hotel.checkOut && dateString > hotel.checkIn && dateString < hotel.checkOut) {
+      events.push({ kind: "hotel", target: "hotel", targetId: hotel.id, title: `Stay: ${hotel.name}`, meta: hotel.address });
+    }
+  });
+
+  trip.days
+    .filter((day) => day.date === dateString)
+    .forEach((day) => {
+      events.push({ kind: "day", target: "day", targetId: day.id, title: day.title || "Daily plan", meta: day.notes });
+      day.stops
+        .slice()
+        .sort((a, b) => String(a.time || "").localeCompare(String(b.time || "")))
+        .forEach((stop) => {
+          events.push({
+            kind: stop.type === "hotel" ? "hotel" : "stop",
+            target: "stop",
+            targetId: stop.id,
+            title: stop.time ? `${stop.time} ${stop.name}` : stop.name,
+            meta: tripStopTypeLabel(stop.type),
+          });
+        });
+    });
+
+  return events;
+}
+
+function scrollToVacationTarget(target, targetId) {
+  if (target === "trip") {
+    elements.tripDetail.scrollIntoView({ behavior: "smooth", block: "start" });
+    return;
+  }
+
+  const selectors = {
+    hotel: `[data-hotel-card="${CSS.escape(targetId)}"]`,
+    day: `[data-trip-day-card="${CSS.escape(targetId)}"]`,
+    stop: `[data-stop-drag="${CSS.escape(targetId)}"]`,
+  };
+  const row = elements.tripDetail.querySelector(selectors[target]);
+  row?.scrollIntoView({ behavior: "smooth", block: "center" });
 }
 
 function getWishEventsForDate(dateString) {
@@ -4301,6 +4433,13 @@ function daysUntil(dateString) {
 function parseLocalDate(dateString) {
   const [year, month, day] = dateString.split("-").map(Number);
   return new Date(year, month - 1, day);
+}
+
+function monthForDate(dateString) {
+  if (!dateString) return null;
+  const date = parseLocalDate(dateString);
+  if (Number.isNaN(date.getTime())) return null;
+  return new Date(date.getFullYear(), date.getMonth(), 1);
 }
 
 function toISODate(date) {
