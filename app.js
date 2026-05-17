@@ -1429,7 +1429,8 @@ function renderTripDetail() {
 function renderVacationCalendar() {
   const trip = getSelectedTrip();
   const monthName = visibleVacationMonth.toLocaleDateString(undefined, { month: "long", year: "numeric" });
-  elements.vacationMonthLabel.textContent = trip ? `${trip.title} · ${monthName}` : monthName;
+  elements.vacationMonthLabel.textContent = trip ? trip.title : "Calendar";
+  elements.vacationTripMonthBtn.textContent = monthName;
 
   const weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   const start = new Date(visibleVacationMonth);
