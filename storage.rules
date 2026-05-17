@@ -1,0 +1,49 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    function signedInEmail() {
+      return request.auth.token.email.lower();
+    }
+
+    function isSignedIn() {
+      return request.auth != null && request.auth.token.email != null;
+    }
+
+    function isLegacyDefaultFamilyMember(familyId) {
+      return familyId == "default-family"
+        && signedInEmail() in [
+          "navalvaidya@gmail.com",
+          "priyanka.naval.vaidya@gmail.com",
+          "vivaanvaidya@gmail.com",
+          "yuvikavaidya@gmail.com"
+        ];
+    }
+
+    function familyData(familyId) {
+      return firestore.get(/databases/(default)/documents/families/$(familyId)).data;
+    }
+
+    function familyExists(familyId) {
+      return firestore.exists(/databases/(default)/documents/families/$(familyId));
+    }
+
+    function isFamilyMember(familyId) {
+      return isSignedIn()
+        && (
+          isLegacyDefaultFamilyMember(familyId)
+          ||
+          (
+            familyExists(familyId)
+            &&
+            familyData(familyId).allowedEmails is list
+            && signedInEmail() in familyData(familyId).allowedEmails
+          )
+        );
+    }
+
+    match /families/{familyId}/{allPaths=**} {
+      allow read, write: if isFamilyMember(familyId);
+    }
+  }
+}

@@ -17,6 +17,7 @@
     <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js" defer></script>
     <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js" defer></script>
     <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js" defer></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-storage-compat.js" defer></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js" defer></script>
     <script src="app.js" defer></script>
@@ -331,10 +332,17 @@
           </div>
           <form class="notebook-form" id="notebookForm">
             <textarea id="notebookInput" rows="4" maxlength="1200" placeholder="Write a note for your notebook"></textarea>
-            <button class="primary-button" type="submit">
-              <i data-lucide="book-plus"></i>
-              Add note
-            </button>
+            <div class="form-action-row">
+              <label class="secondary-button attachment-picker">
+                <i data-lucide="paperclip"></i>
+                Attach files
+                <input id="notebookAttachments" type="file" multiple accept="image/*,.pdf,.txt,.csv,.doc,.docx,.xls,.xlsx" />
+              </label>
+              <button class="primary-button" type="submit">
+                <i data-lucide="book-plus"></i>
+                Add note
+              </button>
+            </div>
           </form>
           <div class="notebook-list" id="notebookList"></div>
         </section>
@@ -623,6 +631,19 @@
           Notes
           <textarea id="vacationItemNotes" rows="4" maxlength="260" placeholder="Confirmation, tickets, must order, parking, or anything useful"></textarea>
         </label>
+
+        <div class="attachment-field">
+          <div>
+            <strong>Attachments</strong>
+            <span>Tickets, screenshots, PDFs, confirmations, or menus</span>
+          </div>
+          <div class="attachment-list" id="vacationItemAttachmentList"></div>
+          <label class="secondary-button attachment-picker">
+            <i data-lucide="paperclip"></i>
+            Attach files
+            <input id="vacationItemAttachments" type="file" multiple accept="image/*,.pdf,.txt,.csv,.doc,.docx,.xls,.xlsx" />
+          </label>
+        </div>
 
         <div class="dialog-actions">
           <button class="secondary-button" id="deleteVacationItemBtn" type="button">

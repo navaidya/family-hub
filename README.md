@@ -26,7 +26,7 @@ When hosted on HTTPS, family members can open the web address in Safari on iPhon
 
 ## Firebase sync
 
-Family Hub can sync shared family workspaces through Firebase Authentication and Cloud Firestore.
+Family Hub can sync shared family workspaces through Firebase Authentication, Cloud Firestore, and Firebase Storage for note and vacation attachments.
 
 1. Create a Firebase project.
 2. Add a Web app in Firebase project settings.
@@ -34,10 +34,11 @@ Family Hub can sync shared family workspaces through Firebase Authentication and
 4. In Firebase Authentication, enable Google sign-in.
 5. In Firestore Database, create a database.
 6. Publish `firestore.rules` in Firebase Firestore Rules.
+7. In Firebase Storage, create a storage bucket and publish `storage.rules`.
 8. Deploy/push this repo to GitHub Pages.
 9. Open Family Hub, sign in with Google, and configure the family workspace from the account menu.
 
-The website is still hosted by GitHub Pages. Firebase stores each family workspace in Google's cloud under `families/{familyId}`. Access is based on allowed member emails stored on that family document.
+The website is still hosted by GitHub Pages. Firebase stores each family workspace in Google's cloud under `families/{familyId}`. Attachments are stored in Firebase Storage under `families/{familyId}/...`. Access is based on allowed member emails stored on that family document.
 
 ## GitHub Pages deploy speed
 

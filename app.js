@@ -3,6 +3,8 @@ const LEGACY_STORAGE_KEY = "family-planner-state-v1";
 const LOCAL_PROFILE_KEY = "family-hub-local-profile-v1";
 const FAMILY_ID_KEY = "family-hub-family-id-v1";
 const ADMIN_MEMBER_ID = "me";
+const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
+const ATTACHMENT_ACCEPT = "image/*,.pdf,.txt,.csv,.doc,.docx,.xls,.xlsx";
 
 const statuses = [
   { id: "all", label: "All" },
@@ -103,6 +105,8 @@ let visibleVacationMonth = monthForDate(state.trips?.[0]?.startDate) || new Date
 let visibleFinanceMonth = new Date(today.getFullYear(), today.getMonth(), 1);
 let pendingLoginMemberId = state.currentMemberId;
 let cloudState = createCloudState();
+let vacationItemCurrentAttachments = [];
+let vacationItemAttachmentsToDelete = new Set();
 
 const elements = {
   authGate: document.querySelector("#authGate"),
@@ -188,6 +192,7 @@ const elements = {
   notebookTitle: document.querySelector("#notebookTitle"),
   notebookForm: document.querySelector("#notebookForm"),
   notebookInput: document.querySelector("#notebookInput"),
+  notebookAttachments: document.querySelector("#notebookAttachments"),
   notebookList: document.querySelector("#notebookList"),
   prevMonthBtn: document.querySelector("#prevMonthBtn"),
   nextMonthBtn: document.querySelector("#nextMonthBtn"),
@@ -274,6 +279,8 @@ const vacationItemForm = {
   address: document.querySelector("#vacationItemAddress"),
   url: document.querySelector("#vacationItemUrl"),
   notes: document.querySelector("#vacationItemNotes"),
+  attachments: document.querySelector("#vacationItemAttachments"),
+  attachmentList: document.querySelector("#vacationItemAttachmentList"),
 };
 
 const wishForm = {
@@ -394,10 +401,11 @@ function normalizeNotes(notes = {}) {
       .map((note) => ({
         id: note.id || crypto.randomUUID(),
         text: note.text.trim(),
+        attachments: normalizeAttachments(note.attachments),
         createdAt: note.createdAt || new Date().toISOString(),
         updatedAt: note.updatedAt || note.createdAt || new Date().toISOString(),
       }))
-      .filter((note) => note.text)
+      .filter((note) => note.text || note.attachments.length)
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
     return notebooks;
   }, {});
@@ -433,6 +441,7 @@ function normalizeHotels(hotels = []) {
     checkOut: hotel.checkOut || "",
     bookingUrl: String(hotel.bookingUrl || "").trim(),
     notes: String(hotel.notes || "").trim(),
+    attachments: normalizeAttachments(hotel.attachments),
   }));
 }
 
@@ -459,6 +468,7 @@ function normalizeTripStops(stops = []) {
     time: String(stop.time || "").trim(),
     url: String(stop.url || "").trim(),
     notes: String(stop.notes || "").trim(),
+    attachments: normalizeAttachments(stop.attachments),
     addedBy: getKnownMemberId(stop.addedBy) || "",
     addedAt: stop.addedAt || "",
     source: String(stop.source || "").trim(),
@@ -570,6 +580,23 @@ function normalizeDueDay(day) {
   const numeric = Number(day);
   if (!Number.isFinite(numeric) || numeric < 1) return "";
   return Math.min(31, Math.floor(numeric));
+}
+
+function normalizeAttachments(attachments = []) {
+  if (!Array.isArray(attachments)) return [];
+  return attachments
+    .filter((attachment) => attachment && typeof attachment === "object")
+    .map((attachment) => ({
+      id: attachment.id || crypto.randomUUID(),
+      name: String(attachment.name || "Attachment").trim().slice(0, 140),
+      type: String(attachment.type || "application/octet-stream").trim(),
+      size: Number(attachment.size) || 0,
+      url: String(attachment.url || "").trim(),
+      path: String(attachment.path || "").trim(),
+      createdAt: attachment.createdAt || new Date().toISOString(),
+      createdBy: getKnownMemberId(attachment.createdBy) || "",
+    }))
+    .filter((attachment) => attachment.url || attachment.path);
 }
 
 function seedTasks() {
@@ -728,6 +755,7 @@ function createCloudState() {
     user: null,
     auth: null,
     db: null,
+    storage: null,
     familyId: "",
     familyRef: null,
     unsubscribe: null,
@@ -755,6 +783,7 @@ function initCloudSync() {
 
     cloudState.auth = firebase.auth();
     cloudState.db = firebase.firestore();
+    cloudState.storage = firebase.storage ? firebase.storage() : null;
     cloudState.enabled = true;
 
     cloudState.auth.onAuthStateChanged((user) => {
@@ -929,6 +958,141 @@ function saveCloudState(force = false) {
     renderCloudStatus();
     renderCloudDialog();
   });
+}
+
+function attachmentStorageReady() {
+  return Boolean(cloudState.enabled && cloudState.user && cloudState.storage);
+}
+
+function requireAttachmentStorage() {
+  if (attachmentStorageReady()) return;
+  throw userFacingError("Sign in with Google first. Attachments are stored securely in Firebase Storage so every family member can open them.");
+}
+
+function userFacingError(message) {
+  const error = new Error(message);
+  error.userFacing = true;
+  return error;
+}
+
+async function uploadAttachments(fileList, folder) {
+  const files = [...(fileList || [])];
+  if (!files.length) return [];
+  requireAttachmentStorage();
+
+  const oversized = files.find((file) => file.size > MAX_ATTACHMENT_BYTES);
+  if (oversized) {
+    throw userFacingError(`${oversized.name} is too large. Please keep each attachment under ${formatFileSize(MAX_ATTACHMENT_BYTES)}.`);
+  }
+
+  const uploaded = [];
+  const now = new Date().toISOString();
+  for (const file of files) {
+    const id = crypto.randomUUID();
+    const safeName = safeStorageFileName(file.name);
+    const path = `families/${getActiveFamilyId()}/${folder}/${id}-${safeName}`;
+    const ref = cloudState.storage.ref().child(path);
+    const snapshot = await ref.put(file, {
+      contentType: file.type || "application/octet-stream",
+      customMetadata: {
+        familyId: getActiveFamilyId(),
+        uploadedBy: cloudState.user.email || cloudState.user.uid || state.currentMemberId,
+      },
+    });
+    const url = await snapshot.ref.getDownloadURL();
+    uploaded.push({
+      id,
+      name: file.name || "Attachment",
+      type: file.type || "application/octet-stream",
+      size: file.size || 0,
+      url,
+      path,
+      createdAt: now,
+      createdBy: state.currentMemberId,
+    });
+  }
+  return uploaded;
+}
+
+async function deleteAttachmentFiles(attachments = []) {
+  if (!attachmentStorageReady()) return;
+  await Promise.all(
+    normalizeAttachments(attachments)
+      .filter((attachment) => attachment.path)
+      .map((attachment) =>
+        cloudState.storage
+          .ref()
+          .child(attachment.path)
+          .delete()
+          .catch((error) => {
+            if (error?.code !== "storage/object-not-found") {
+              console.warn("Could not delete attachment", attachment.path, error);
+            }
+          }),
+      ),
+  );
+}
+
+function safeStorageFileName(name) {
+  const cleaned = String(name || "attachment")
+    .trim()
+    .replace(/[^a-zA-Z0-9._-]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 90);
+  return cleaned || "attachment";
+}
+
+function renderAttachmentList(attachments = [], options = {}) {
+  const normalized = normalizeAttachments(attachments);
+  if (!normalized.length) return "";
+  const deleteAttributes = options.deleteAttributes || (() => "");
+  return `
+    <div class="attachment-list-inner">
+      ${normalized
+        .map(
+          (attachment) => `
+            <div class="attachment-chip">
+              <a href="${escapeAttribute(attachment.url)}" target="_blank" rel="noreferrer" title="${escapeAttribute(attachment.name)}">
+                <i data-lucide="${attachmentIcon(attachment)}"></i>
+                <span>${escapeHTML(attachment.name)}</span>
+                <small>${formatFileSize(attachment.size)}</small>
+              </a>
+              ${
+                options.deletable
+                  ? `<button class="icon-button danger" type="button" ${deleteAttributes(attachment)} title="Remove attachment" aria-label="Remove attachment">
+                      <i data-lucide="x"></i>
+                    </button>`
+                  : ""
+              }
+            </div>
+          `,
+        )
+        .join("")}
+    </div>
+  `;
+}
+
+function attachmentIcon(attachment) {
+  const type = attachment.type || "";
+  const name = attachment.name || "";
+  if (type.startsWith("image/")) return "image";
+  if (type.includes("pdf") || /\.pdf$/i.test(name)) return "file-text";
+  if (/\.(docx?|pages)$/i.test(name)) return "file-text";
+  if (/\.(xlsx?|numbers|csv)$/i.test(name)) return "table";
+  return "paperclip";
+}
+
+function formatFileSize(bytes) {
+  const size = Number(bytes) || 0;
+  if (size >= 1024 * 1024) return `${(size / (1024 * 1024)).toFixed(size >= 10 * 1024 * 1024 ? 0 : 1)} MB`;
+  if (size >= 1024) return `${Math.round(size / 1024)} KB`;
+  return `${size} B`;
+}
+
+function calendarMeta(label, attachments = []) {
+  const count = normalizeAttachments(attachments).length;
+  const parts = [label, count ? `${count} attachment${count === 1 ? "" : "s"}` : ""].filter(Boolean);
+  return parts.join(" · ");
 }
 
 function familyAllowedEmails() {
@@ -1178,6 +1342,8 @@ function render() {
 function saveState() {
   state.family = normalizeFamilyProfile(state.family, state.members);
   state.tasks = normalizeTasks(state.tasks);
+  state.notes = normalizeNotes(state.notes);
+  state.trips = normalizeTrips(state.trips);
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   localStorage.setItem(LOCAL_PROFILE_KEY, state.currentMemberId);
   localStorage.removeItem(LEGACY_STORAGE_KEY);
@@ -1652,6 +1818,9 @@ function openVacationItemDialog({ date = isoToday, item = null, type = "sightsee
   vacationItemForm.address.value = item?.address || "";
   vacationItemForm.url.value = isHotel ? item?.bookingUrl || "" : item?.url || "";
   vacationItemForm.notes.value = item?.notes || "";
+  vacationItemCurrentAttachments = normalizeAttachments(item?.attachments);
+  vacationItemAttachmentsToDelete = new Set();
+  renderVacationItemAttachmentList();
   syncVacationItemTypeFields();
   elements.vacationItemDialog.showModal();
   vacationItemForm.name.focus();
@@ -1662,6 +1831,27 @@ function closeVacationItemDialog() {
   elements.vacationItemDialog.close();
   elements.vacationItemForm.reset();
   vacationItemForm.sourceDayId.value = "";
+  vacationItemCurrentAttachments = [];
+  vacationItemAttachmentsToDelete = new Set();
+  renderVacationItemAttachmentList();
+}
+
+function renderVacationItemAttachmentList() {
+  const visibleAttachments = vacationItemCurrentAttachments.filter((attachment) => !vacationItemAttachmentsToDelete.has(attachment.id));
+  vacationItemForm.attachmentList.innerHTML = visibleAttachments.length
+    ? renderAttachmentList(visibleAttachments, {
+        deletable: true,
+        deleteAttributes: (attachment) => `data-vacation-attachment-remove="${escapeAttribute(attachment.id)}"`,
+      })
+    : `<div class="empty-state compact">No attachments yet.</div>`;
+
+  vacationItemForm.attachmentList.querySelectorAll("[data-vacation-attachment-remove]").forEach((button) => {
+    button.addEventListener("click", () => {
+      vacationItemAttachmentsToDelete.add(button.dataset.vacationAttachmentRemove);
+      renderVacationItemAttachmentList();
+      refreshIcons();
+    });
+  });
 }
 
 function syncVacationItemTypeFields() {
@@ -1673,16 +1863,31 @@ function syncVacationItemTypeFields() {
   vacationItemForm.time.closest("label").style.opacity = isHotel ? "0.55" : "1";
 }
 
-function saveVacationItemFromForm(event) {
+async function saveVacationItemFromForm(event) {
   event.preventDefault();
   const trip = getSelectedTrip();
   if (!trip) return;
 
+  const submitButton = elements.vacationItemForm.querySelector('button[type="submit"]');
   const id = vacationItemForm.id.value || crypto.randomUUID();
   const type = vacationItemForm.type.value;
   const date = vacationItemForm.date.value || trip.startDate;
   const existingHotel = trip.hotels.find((hotel) => hotel.id === id);
   const existingStop = findTripStop(trip, id, vacationItemForm.sourceDayId.value);
+  const removedAttachments = vacationItemCurrentAttachments.filter((attachment) => vacationItemAttachmentsToDelete.has(attachment.id));
+  const keptAttachments = vacationItemCurrentAttachments.filter((attachment) => !vacationItemAttachmentsToDelete.has(attachment.id));
+  let attachments = keptAttachments;
+
+  try {
+    submitButton.disabled = true;
+    const uploaded = await uploadAttachments(vacationItemForm.attachments.files, `vacation/${trip.id}`);
+    attachments = [...keptAttachments, ...uploaded];
+  } catch (error) {
+    console.error(error);
+    window.alert(error.userFacing ? error.message : "Attachment upload failed. The vacation item was not saved.");
+    submitButton.disabled = false;
+    return;
+  }
 
   if (type === "hotel") {
     if (existingStop) {
@@ -1697,6 +1902,7 @@ function saveVacationItemFromForm(event) {
       checkOut,
       bookingUrl: vacationItemForm.url.value.trim(),
       notes: vacationItemForm.notes.value.trim(),
+      attachments,
     };
     if (existingHotel) {
       trip.hotels = trip.hotels.map((item) => (item.id === id ? hotel : item));
@@ -1717,6 +1923,7 @@ function saveVacationItemFromForm(event) {
       address: vacationItemForm.address.value.trim(),
       url: vacationItemForm.url.value.trim(),
       notes: vacationItemForm.notes.value.trim(),
+      attachments,
       addedBy: existingStop?.stop.addedBy || state.currentMemberId,
       addedAt: existingStop?.stop.addedAt || new Date().toISOString(),
       source: existingStop?.stop.source || "Vacation calendar",
@@ -1734,11 +1941,13 @@ function saveVacationItemFromForm(event) {
   trip.updatedAt = new Date().toISOString();
   visibleVacationMonth = monthForDate(date) || visibleVacationMonth;
   saveState();
+  deleteAttachmentFiles(removedAttachments);
   closeVacationItemDialog();
+  submitButton.disabled = false;
   renderTrips();
 }
 
-function deleteCurrentVacationItem() {
+async function deleteCurrentVacationItem() {
   const trip = getSelectedTrip();
   const id = vacationItemForm.id.value;
   if (!trip || !id) return;
@@ -1747,8 +1956,10 @@ function deleteCurrentVacationItem() {
   if (!confirmed) return;
 
   const hotelCount = trip.hotels.length;
+  const hotel = trip.hotels.find((item) => item.id === id);
   trip.hotels = trip.hotels.filter((hotel) => hotel.id !== id);
   const match = findTripStop(trip, id, vacationItemForm.sourceDayId.value);
+  const attachments = hotel?.attachments || match?.stop.attachments || [];
   if (match) {
     match.day.stops = match.day.stops.filter((stop) => stop.id !== id);
   }
@@ -1756,6 +1967,7 @@ function deleteCurrentVacationItem() {
   if (hotelCount !== trip.hotels.length || match) {
     trip.updatedAt = new Date().toISOString();
     saveState();
+    deleteAttachmentFiles(attachments);
   }
   closeVacationItemDialog();
   renderTrips();
@@ -1839,6 +2051,7 @@ function renderHotelCard(hotel) {
         <p>${escapeHTML(hotel.address || "No address added.")}</p>
         <p>${escapeHTML(formatStayRange(hotel))}</p>
         ${hotel.notes ? `<p>${escapeHTML(hotel.notes)}</p>` : ""}
+        ${renderAttachmentList(hotel.attachments)}
       </div>
       <div class="detail-actions">
         ${hotel.bookingUrl ? `<a class="secondary-button" href="${escapeAttribute(hotel.bookingUrl)}" target="_blank" rel="noreferrer"><i data-lucide="external-link"></i>Booking</a>` : ""}
@@ -1940,6 +2153,7 @@ function renderTripStop(trip, day, stop) {
         <strong>${escapeHTML(stop.time ? `${stop.time} · ${stop.name}` : stop.name)}</strong>
         <p>${escapeHTML(stop.address || "No address added.")}</p>
         ${stop.notes ? `<p>${escapeHTML(stop.notes)}</p>` : ""}
+        ${renderAttachmentList(stop.attachments)}
         ${attribution}
       </div>
       <div class="detail-actions">
@@ -3273,9 +3487,21 @@ function renderNotebook() {
       (note) => `
         <article class="notebook-note">
           <p class="note-text">${escapeHTML(note.text)}</p>
+          ${renderAttachmentList(note.attachments)}
           <div class="note-footer">
             <span class="reminder-meta">${formatDateTime(note.updatedAt)}</span>
             <span class="note-actions">
+              <label class="icon-button" title="Add attachment" aria-label="Add attachment">
+                <i data-lucide="paperclip"></i>
+                <input type="file" multiple accept="${ATTACHMENT_ACCEPT}" data-note-attach="${escapeAttribute(note.id)}" />
+              </label>
+              ${
+                note.attachments?.length
+                  ? `<button class="icon-button danger" type="button" data-note-attachment-menu="${escapeAttribute(note.id)}" title="Remove an attachment" aria-label="Remove an attachment">
+                      <i data-lucide="file-x"></i>
+                    </button>`
+                  : ""
+              }
               <button class="icon-button" type="button" data-note-edit="${escapeAttribute(note.id)}" title="Edit note" aria-label="Edit note">
                 <i data-lucide="pencil"></i>
               </button>
@@ -3293,6 +3519,14 @@ function renderNotebook() {
     button.addEventListener("click", () => editNotebookNote(button.dataset.noteEdit));
   });
 
+  elements.notebookList.querySelectorAll("[data-note-attach]").forEach((input) => {
+    input.addEventListener("change", (event) => addAttachmentsToNotebookNote(input.dataset.noteAttach, event.target.files, event.target));
+  });
+
+  elements.notebookList.querySelectorAll("[data-note-attachment-menu]").forEach((button) => {
+    button.addEventListener("click", () => removeNotebookAttachment(button.dataset.noteAttachmentMenu));
+  });
+
   elements.notebookList.querySelectorAll("[data-note-delete]").forEach((button) => {
     button.addEventListener("click", () => deleteNotebookNote(button.dataset.noteDelete));
   });
@@ -3300,22 +3534,38 @@ function renderNotebook() {
   refreshIcons();
 }
 
-function addNotebookNote(event) {
+async function addNotebookNote(event) {
   event.preventDefault();
   const text = elements.notebookInput.value.trim();
-  if (!text) return;
+  const files = [...(elements.notebookAttachments?.files || [])];
+  if (!text && !files.length) return;
+
+  const submitButton = elements.notebookForm.querySelector('button[type="submit"]');
+  let attachments = [];
+  try {
+    submitButton.disabled = true;
+    attachments = await uploadAttachments(files, `notebooks/${state.currentMemberId}`);
+  } catch (error) {
+    console.error(error);
+    window.alert(error.userFacing ? error.message : "Attachment upload failed. The note was not saved.");
+    submitButton.disabled = false;
+    return;
+  }
 
   const now = new Date().toISOString();
   getNotebookNotes(state.currentMemberId).unshift({
     id: crypto.randomUUID(),
-    text,
+    text: text || "Attachment",
+    attachments,
     createdAt: now,
     updatedAt: now,
   });
 
   elements.notebookInput.value = "";
+  if (elements.notebookAttachments) elements.notebookAttachments.value = "";
   saveState();
   renderNotebook();
+  submitButton.disabled = false;
 }
 
 function editNotebookNote(id) {
@@ -3338,7 +3588,47 @@ function editNotebookNote(id) {
   renderNotebook();
 }
 
-function deleteNotebookNote(id) {
+async function addAttachmentsToNotebookNote(id, fileList, input) {
+  const notes = getNotebookNotes(state.currentMemberId);
+  const note = notes.find((item) => item.id === id);
+  if (!note) return;
+  try {
+    const attachments = await uploadAttachments(fileList, `notebooks/${state.currentMemberId}`);
+    if (!attachments.length) return;
+    note.attachments = [...normalizeAttachments(note.attachments), ...attachments];
+    note.updatedAt = new Date().toISOString();
+    notes.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+    saveState();
+    renderNotebook();
+  } catch (error) {
+    console.error(error);
+    window.alert(error.userFacing ? error.message : "Attachment upload failed. The note was not updated.");
+  } finally {
+    if (input) input.value = "";
+  }
+}
+
+async function removeNotebookAttachment(id) {
+  const notes = getNotebookNotes(state.currentMemberId);
+  const note = notes.find((item) => item.id === id);
+  if (!note?.attachments?.length) return;
+  const attachmentNames = note.attachments.map((attachment, index) => `${index + 1}. ${attachment.name}`).join("\n");
+  const choice = window.prompt(`Which attachment should be removed?\n\n${attachmentNames}`, "1");
+  if (choice === null) return;
+  const index = Number(choice) - 1;
+  const attachment = note.attachments[index];
+  if (!attachment) return;
+  const confirmed = window.confirm(`Remove "${attachment.name}" from this note?`);
+  if (!confirmed) return;
+
+  note.attachments = note.attachments.filter((item) => item.id !== attachment.id);
+  note.updatedAt = new Date().toISOString();
+  saveState();
+  deleteAttachmentFiles([attachment]);
+  renderNotebook();
+}
+
+async function deleteNotebookNote(id) {
   const notes = getNotebookNotes(state.currentMemberId);
   const note = notes.find((item) => item.id === id);
   if (!note) return;
@@ -3347,6 +3637,7 @@ function deleteNotebookNote(id) {
 
   state.notes[state.currentMemberId] = notes.filter((item) => item.id !== id);
   saveState();
+  deleteAttachmentFiles(note.attachments);
   renderNotebook();
 }
 
@@ -4538,11 +4829,11 @@ function getVacationCalendarEventsForDate(trip, dateString) {
 
   trip.hotels.forEach((hotel) => {
     if (dateString === hotel.checkIn) {
-      events.push({ kind: "hotel", target: "hotel", targetId: hotel.id, title: `Check in: ${hotel.name}`, meta: hotel.address, draggable: true });
+      events.push({ kind: "hotel", target: "hotel", targetId: hotel.id, title: `Check in: ${hotel.name}`, meta: calendarMeta(hotel.address, hotel.attachments), draggable: true });
     } else if (dateString === hotel.checkOut) {
-      events.push({ kind: "hotel", target: "hotel", targetId: hotel.id, title: `Check out: ${hotel.name}`, meta: hotel.address, draggable: true });
+      events.push({ kind: "hotel", target: "hotel", targetId: hotel.id, title: `Check out: ${hotel.name}`, meta: calendarMeta(hotel.address, hotel.attachments), draggable: true });
     } else if (hotel.checkIn && hotel.checkOut && dateString > hotel.checkIn && dateString < hotel.checkOut) {
-      events.push({ kind: "hotel", target: "hotel", targetId: hotel.id, title: `Stay: ${hotel.name}`, meta: hotel.address, draggable: true });
+      events.push({ kind: "hotel", target: "hotel", targetId: hotel.id, title: `Stay: ${hotel.name}`, meta: calendarMeta(hotel.address, hotel.attachments), draggable: true });
     }
   });
 
@@ -4559,7 +4850,7 @@ function getVacationCalendarEventsForDate(trip, dateString) {
             targetId: stop.id,
             sourceDayId: day.id,
             title: stop.time ? `${stop.time} ${stop.name}` : stop.name,
-            meta: tripStopTypeLabel(stop.type),
+            meta: calendarMeta(tripStopTypeLabel(stop.type), stop.attachments),
             draggable: true,
           });
         });
