@@ -8,11 +8,7 @@ The main page includes a local Family Hub Assistant for quick questions about cu
 
 Each family member has a profile. The current Google account maps to a member by email when Firebase sync is on. Use the account menu to edit profile settings or configure the family workspace.
 
-PINs are optional lightweight household controls. They are not secure authentication and should not be treated like passwords.
-
 Email reminder buttons use `mailto:` links, so they open the default email client with a prefilled progress message. Automatic background email delivery would require a small backend with SMTP or an email provider.
-
-PINs are stored in the browser's local storage, and in Firestore when sync is enabled, for lightweight household use.
 
 ## Native iOS app
 

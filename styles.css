@@ -1662,18 +1662,6 @@ label.import-button {
   font-size: 0.9rem;
 }
 
-.admin-pin-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-}
-
-.admin-pin-grid label {
-  display: grid;
-  gap: 6px;
-  font-weight: 800;
-}
-
 .calendar {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
@@ -2191,7 +2179,6 @@ label.import-button {
   .form-grid,
   .travel-form,
   .finance-manual-form,
-  .admin-pin-grid,
   .assistant-form,
   .login-grid,
   .comment-form {

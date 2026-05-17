@@ -49,7 +49,6 @@ const familyMembers = [
     email: "",
     phone: "",
     color: "#0f766e",
-    pin: "",
     settings: { reminderDays: 7, includeInDigest: true },
   },
   {
@@ -59,7 +58,6 @@ const familyMembers = [
     email: "",
     phone: "",
     color: "#4754a3",
-    pin: "",
     settings: { reminderDays: 7, includeInDigest: true },
   },
   {
@@ -69,7 +67,6 @@ const familyMembers = [
     email: "",
     phone: "",
     color: "#d95f43",
-    pin: "",
     settings: { reminderDays: 5, includeInDigest: true },
   },
   {
@@ -79,7 +76,6 @@ const familyMembers = [
     email: "",
     phone: "",
     color: "#237a57",
-    pin: "",
     settings: { reminderDays: 3, includeInDigest: true },
   },
 ];
@@ -199,8 +195,6 @@ const elements = {
   loginDialog: document.querySelector("#loginDialog"),
   loginForm: document.querySelector("#loginForm"),
   loginMemberGrid: document.querySelector("#loginMemberGrid"),
-  loginPin: document.querySelector("#loginPin"),
-  loginError: document.querySelector("#loginError"),
   closeLoginBtn: document.querySelector("#closeLoginBtn"),
   cancelLoginBtn: document.querySelector("#cancelLoginBtn"),
   profileDialog: document.querySelector("#profileDialog"),
@@ -212,11 +206,8 @@ const elements = {
   profileEmail: document.querySelector("#profileEmail"),
   profilePhone: document.querySelector("#profilePhone"),
   profileColor: document.querySelector("#profileColor"),
-  profilePin: document.querySelector("#profilePin"),
   profileReminderDays: document.querySelector("#profileReminderDays"),
   profileDigest: document.querySelector("#profileDigest"),
-  profileAdminPanel: document.querySelector("#profileAdminPanel"),
-  profileAdminPins: document.querySelector("#profileAdminPins"),
   closeProfileBtn: document.querySelector("#closeProfileBtn"),
   cancelProfileBtn: document.querySelector("#cancelProfileBtn"),
   accountDialog: document.querySelector("#accountDialog"),
@@ -339,6 +330,8 @@ function loadState() {
 function normalizeMembers(savedMembers = []) {
   return familyMembers.map((defaultMember) => {
     const saved = savedMembers.find((member) => member.id === defaultMember.id) ?? {};
+    const savedProfile = { ...saved };
+    delete savedProfile["p" + "in"];
     const savedName = saved.name ?? defaultMember.name;
     const shouldUseDefaultName = savedName === legacyNames[defaultMember.id];
     const savedEmail = saved.email ?? defaultMember.email;
@@ -347,11 +340,10 @@ function normalizeMembers(savedMembers = []) {
 
     return {
       ...defaultMember,
-      ...saved,
+      ...savedProfile,
       name: shouldUseDefaultName ? defaultMember.name : savedName,
       email: shouldUseDefaultEmail ? defaultMember.email : savedEmail,
       phone: normalizePhone(savedPhone),
-      pin: normalizePin(saved.pin || defaultMember.pin),
       settings: {
         ...defaultMember.settings,
         ...(saved.settings ?? {}),
@@ -562,10 +554,6 @@ function normalizeWishComments(comments = []) {
       text: comment.text.trim(),
     }))
     .filter((comment) => comment.text);
-}
-
-function normalizePin(pin) {
-  return String(pin || "").trim();
 }
 
 function normalizePhone(phone) {
@@ -2816,13 +2804,8 @@ function inferFinanceCategory(text) {
 
 function openLoginDialog(memberId = state.currentMemberId) {
   pendingLoginMemberId = memberId || state.currentMemberId;
-  elements.loginPin.value = "";
-  elements.loginError.textContent = "";
   renderLoginOptions();
   elements.loginDialog.showModal();
-  if (getMember(pendingLoginMemberId)?.pin) {
-    elements.loginPin.focus();
-  }
   refreshIcons();
 }
 
@@ -2834,7 +2817,7 @@ function renderLoginOptions() {
           <span class="avatar" style="background:${member.color}">${initials(member.name)}</span>
           <span>
             <strong>${escapeHTML(member.name)}</strong><br />
-            <small>${member.pin ? "PIN enabled" : "No PIN set"}</small>
+            <small>${escapeHTML(member.email || "Local profile")}</small>
           </span>
         </button>
       `,
@@ -2844,11 +2827,7 @@ function renderLoginOptions() {
   elements.loginMemberGrid.querySelectorAll("[data-login-option]").forEach((button) => {
     button.addEventListener("click", () => {
       pendingLoginMemberId = button.dataset.loginOption;
-      elements.loginError.textContent = "";
       renderLoginOptions();
-      if (getMember(pendingLoginMemberId)?.pin) {
-        elements.loginPin.focus();
-      }
     });
   });
 }
@@ -2857,12 +2836,6 @@ function loginAsSelectedMember(event) {
   event.preventDefault();
   const member = getMember(pendingLoginMemberId);
   if (!member) return;
-
-  if (member.pin && elements.loginPin.value !== member.pin) {
-    elements.loginError.textContent = "That PIN does not match.";
-    elements.loginPin.focus();
-    return;
-  }
 
   state.currentMemberId = member.id;
   activeTaskMemberId = member.id;
@@ -2878,7 +2851,6 @@ function loginAsSelectedMember(event) {
 function closeLoginDialog() {
   elements.loginDialog.close();
   elements.loginForm.reset();
-  elements.loginError.textContent = "";
 }
 
 function openProfileDialog() {
@@ -2889,10 +2861,8 @@ function openProfileDialog() {
   elements.profileEmail.value = member.email;
   elements.profilePhone.value = member.phone || "";
   elements.profileColor.value = member.color;
-  elements.profilePin.value = member.pin ?? "";
   elements.profileReminderDays.value = member.settings?.reminderDays ?? 7;
   elements.profileDigest.checked = member.settings?.includeInDigest ?? true;
-  renderAdminPinControls();
   renderProfilePreview();
   elements.profileDialog.showModal();
   elements.profileName.focus();
@@ -2919,16 +2889,10 @@ function saveProfileSettings(event) {
   member.email = elements.profileEmail.value.trim();
   member.phone = normalizePhone(elements.profilePhone.value);
   member.color = elements.profileColor.value;
-  member.pin = normalizePin(elements.profilePin.value);
   member.settings = {
     reminderDays: Number(elements.profileReminderDays.value) || 7,
     includeInDigest: elements.profileDigest.checked,
   };
-
-  if (isAdminMember()) {
-    const updated = applyAdminPinResets();
-    if (!updated) return;
-  }
 
   saveState();
   closeProfileDialog();
@@ -2936,50 +2900,9 @@ function saveProfileSettings(event) {
   render();
 }
 
-function renderAdminPinControls() {
-  const isAdmin = isAdminMember();
-  elements.profileAdminPanel.hidden = !isAdmin;
-  if (!isAdmin) {
-    elements.profileAdminPins.innerHTML = "";
-    return;
-  }
-
-  elements.profileAdminPins.innerHTML = state.members
-    .map(
-      (member) => `
-        <label>
-          ${escapeHTML(member.name)}
-          <input type="password" inputmode="numeric" minlength="4" maxlength="12" placeholder="Leave unchanged" data-admin-pin="${member.id}" />
-        </label>
-      `,
-    )
-    .join("");
-}
-
-function applyAdminPinResets() {
-  const inputs = [...elements.profileAdminPins.querySelectorAll("[data-admin-pin]")];
-  for (const input of inputs) {
-    const pin = normalizePin(input.value);
-    if (!pin) continue;
-    if (pin.length < 4) {
-      window.alert("PIN resets must be at least 4 characters.");
-      input.focus();
-      return false;
-    }
-
-    const member = getMember(input.dataset.adminPin);
-    if (member) {
-      member.pin = pin;
-    }
-  }
-
-  return true;
-}
-
 function closeProfileDialog() {
   elements.profileDialog.close();
   elements.profileForm.reset();
-  elements.profileAdminPins.innerHTML = "";
 }
 
 function renderStatusTabs() {
