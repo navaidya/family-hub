@@ -2195,7 +2195,8 @@ function renderFinanceTotal() {
 }
 
 function renderFinanceCalendar() {
-  elements.financeMonthLabel.textContent = financeMonthName();
+  elements.financeMonthLabel.textContent = "Calendar";
+  elements.financeThisMonthBtn.textContent = financeMonthName();
 
   const weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   const start = new Date(visibleFinanceMonth);
