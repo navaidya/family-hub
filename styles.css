@@ -1152,6 +1152,10 @@ label.import-button {
   margin-top: 14px;
 }
 
+.task-list[hidden] {
+  display: none;
+}
+
 .task-row {
   display: grid;
   grid-template-columns: 1fr auto;

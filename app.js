@@ -2620,42 +2620,7 @@ function populateFormOptions() {
 }
 
 function renderTasks() {
-  const query = elements.searchInput.value.trim().toLowerCase();
-  const tasks = getVisibleTaskCalendarTasks(query);
-
-  elements.taskList.innerHTML = tasks
-    .map((task) => {
-      const dueState = getDueState(task);
-      return `
-        <button class="task-row ${dueState} ${task.status === "done" ? "done" : ""} ${
-          selectedTaskId === task.id ? "selected" : ""
-        }" type="button" data-task-id="${task.id}">
-          <span>
-            <span class="task-title">${escapeHTML(task.title)}</span>
-            <span class="task-meta">
-              <span class="badge ${task.type}">${taskTypeLabel(task.type)}</span>
-              ${task.priority === "high" ? `<span class="badge high">High</span>` : ""}
-              ${task.recurrence === "monthly" ? `<span class="badge repeat"><i data-lucide="rotate-cw"></i>Monthly</span>` : ""}
-              <span>${escapeHTML(memberName(task.requester))} asked</span>
-              <span>${escapeHTML(statusLabel(task.status))}</span>
-            </span>
-          </span>
-          <span class="date-pill">
-            <i data-lucide="calendar-days"></i>
-            ${formatShortDate(task.dueDate)}
-          </span>
-        </button>
-      `;
-    })
-    .join("");
-
-  elements.taskList.querySelectorAll("[data-task-id]").forEach((button) => {
-    button.addEventListener("click", () => {
-      selectedTaskId = button.dataset.taskId;
-      openTaskDialog(getSelectedTask());
-    });
-  });
-
+  elements.taskList.innerHTML = "";
   renderCalendar();
   refreshIcons();
 }
