@@ -1,18 +1,18 @@
 # Family Hub
 
-A browser-based family hub with a task list, task discussion, assignment, calendar due-date tracking, and email reminder composition.
+A browser-based family hub with tasks, wishlists, vacation planning, finance tracking, notebooks, dashboard summaries, and reminder composition.
 
-Open `index.html` in a browser. Tasks are saved to local browser storage, and backup import/export is available from the header.
+Open `index.html` in a browser for local testing, or use the GitHub Pages URL for the hosted app. Family data is saved locally until Firebase sync is configured and a Google account signs in.
 
 The main page includes a local Family Hub Assistant for quick questions about current task data, such as due dates, ownership, overdue tasks, unassigned work, and per-person summaries. This assistant is rule-based and does not send family data to an AI service.
 
-Each family member has a local profile. Use **Switch** to log in as Naval, Priyanka, Vivan, or Yuvika, and use the current profile button to edit that member's name, age, email, color, optional PIN, reminder window, and digest preference. New tasks and comments default to the signed-in profile.
+Each family member has a profile. The current Google account maps to a member by email when Firebase sync is on. Use the account menu to edit profile settings or configure the family workspace.
 
-Default household PINs are set for each member: Naval `1980`, Priyanka `1983`, Vivan `2010`, and Yuvika `2017`. Each member can change their own PIN from profile settings. Naval is the admin profile and can reset any family member's PIN from his profile settings.
+PINs are optional lightweight household controls. They are not secure authentication and should not be treated like passwords.
 
 Email reminder buttons use `mailto:` links, so they open the default email client with a prefilled progress message. Automatic background email delivery would require a small backend with SMTP or an email provider.
 
-PINs are stored in the browser's local storage, and in Firestore when sync is enabled, for lightweight household use. They are not secure account authentication.
+PINs are stored in the browser's local storage, and in Firestore when sync is enabled, for lightweight household use.
 
 ## Native iOS app
 
@@ -30,19 +30,18 @@ When hosted on HTTPS, family members can open the web address in Safari on iPhon
 
 ## Firebase sync
 
-Family Hub can sync shared tasks and member settings through Firebase Authentication and Cloud Firestore.
+Family Hub can sync shared family workspaces through Firebase Authentication and Cloud Firestore.
 
 1. Create a Firebase project.
 2. Add a Web app in Firebase project settings.
 3. Copy the web app config values into `firebase-config.js`.
-4. In Firebase Authentication, enable Email/Password sign-in.
+4. In Firebase Authentication, enable Google sign-in.
 5. In Firestore Database, create a database.
-6. Edit `firestore.rules` and replace the placeholder emails with your family emails.
-7. Paste/publish those rules in Firebase Firestore Rules.
+6. Publish `firestore.rules` in Firebase Firestore Rules.
 8. Deploy/push this repo to GitHub Pages.
-9. Open Family Hub, click the cloud button, and create/sign in with each family login.
+9. Open Family Hub, sign in with Google, and configure the family workspace from the account menu.
 
-The website is still hosted by GitHub Pages. Firebase stores the shared family data in Google's cloud. The active profile on each device remains local so one person switching profiles does not change everyone else's current profile.
+The website is still hosted by GitHub Pages. Firebase stores each family workspace in Google's cloud under `families/{familyId}`. Access is based on allowed member emails stored on that family document.
 
 ## GitHub Pages deploy speed
 

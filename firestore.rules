@@ -2,9 +2,28 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    function isFamilyMember() {
-      return request.auth != null
-        && request.auth.token.email in [
+    function signedInEmail() {
+      return request.auth.token.email.lower();
+    }
+
+    function isSignedIn() {
+      return request.auth != null && request.auth.token.email != null;
+    }
+
+    function isExistingFamilyMember(familyId) {
+      return isSignedIn()
+        && (
+          (
+            resource.data.allowedEmails is list
+            && signedInEmail() in resource.data.allowedEmails
+          )
+          || isLegacyDefaultFamilyMember(familyId)
+        );
+    }
+
+    function isLegacyDefaultFamilyMember(familyId) {
+      return familyId == "default-family"
+        && signedInEmail() in [
           "navalvaidya@gmail.com",
           "priyanka.naval.vaidya@gmail.com",
           "vivaanvaidya@gmail.com",
@@ -12,8 +31,23 @@ service cloud.firestore {
         ];
     }
 
-    match /families/default-family {
-      allow read, write: if isFamilyMember();
+    function isCreatingOwnFamily() {
+      return isSignedIn()
+        && request.resource.data.allowedEmails is list
+        && signedInEmail() in request.resource.data.allowedEmails
+        && request.resource.data.ownerEmail == signedInEmail();
+    }
+
+    function keepsRequesterAsMember() {
+      return request.resource.data.allowedEmails is list
+        && signedInEmail() in request.resource.data.allowedEmails;
+    }
+
+    match /families/{familyId} {
+      allow create: if isCreatingOwnFamily();
+      allow read: if isExistingFamilyMember(familyId);
+      allow update: if isExistingFamilyMember(familyId) && keepsRequesterAsMember();
+      allow delete: if false;
     }
   }
 }

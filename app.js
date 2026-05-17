@@ -1,8 +1,8 @@
 const STORAGE_KEY = "family-hub-state-v1";
 const LEGACY_STORAGE_KEY = "family-planner-state-v1";
 const LOCAL_PROFILE_KEY = "family-hub-local-profile-v1";
+const FAMILY_ID_KEY = "family-hub-family-id-v1";
 const ADMIN_MEMBER_ID = "me";
-const HOME_ADDRESS = "4226 Passeggi Ct, Pleasanton, CA";
 
 const statuses = [
   { id: "all", label: "All" },
@@ -29,111 +29,57 @@ const wishStatuses = [
   { id: "done", label: "Done" },
 ];
 
-const googleEmailMemberIds = {
-  "navalvaidya@gmail.com": "me",
-  "priyanka.naval.vaidya@gmail.com": "wife",
-  "vivaanvaidya@gmail.com": "son",
-  "yuvikavaidya@gmail.com": "daughter",
-};
+const googleEmailMemberIds = {};
 
 const mainViews = [
+  { id: "home", label: "Home", icon: "layout-dashboard" },
   { id: "tasks", label: "Tasks", icon: "list-checks" },
   { id: "wishlist", label: "Wishlist", icon: "sparkles" },
   { id: "vacation", label: "Vacation", icon: "map" },
   { id: "finance", label: "Finance", icon: "wallet-cards" },
 ];
 
-const defaultCreditCards = [
-  {
-    id: "boa-customized-cash",
-    issuer: "Bank of America",
-    name: "Customized Cash Rewards",
-    recommendedUsage:
-      "Use for the 3% choice category you select in Bank of America, especially online shopping if that is your active category. Also useful for grocery stores and wholesale clubs at 2% until the quarterly combined cap.",
-  },
-  {
-    id: "boa-travel-rewards",
-    issuer: "Bank of America",
-    name: "Travel Rewards",
-    recommendedUsage:
-      "Use for foreign travel or international purchases because it has no foreign transaction fees. Good simple backup travel card when you want flexible travel or dining statement credits.",
-  },
-  {
-    id: "boa-unlimited-cash",
-    issuer: "Bank of America",
-    name: "Unlimited Cash Rewards",
-    recommendedUsage:
-      "Use as a catch-all for purchases that do not earn a stronger category bonus on another card. Especially useful if Preferred Rewards boosts your flat cash-back rate.",
-  },
-  {
-    id: "amex-blue-cash-preferred",
-    issuer: "American Express",
-    name: "Blue Cash Preferred",
-    recommendedUsage:
-      "Use for U.S. supermarkets, select U.S. streaming subscriptions, U.S. gas stations, and transit. Best for family groceries and streaming bills before the supermarket annual cap.",
-  },
-  {
-    id: "chase-prime-visa",
-    issuer: "Chase",
-    name: "Prime Visa",
-    recommendedUsage:
-      "Use for Amazon, Amazon Fresh, Whole Foods, and Chase Travel with an eligible Prime membership. Also a solid option for restaurants, gas, and local transit if no better card applies.",
-  },
-  {
-    id: "booking-genius-visa",
-    issuer: "Booking.com / First Electronic Bank",
-    name: "Genius Rewards Visa",
-    recommendedUsage:
-      "Use for Booking.com app stays and Booking.com travel bookings when you want Booking.com travel credits. Also useful for dining, gas, groceries, and eligible in-trip purchases.",
-  },
-  {
-    id: "rei-coop-mastercard",
-    issuer: "Capital One",
-    name: "REI Co-op Mastercard",
-    recommendedUsage:
-      "Use for REI Co-op purchases. Use elsewhere only if you want rewards as REI value; your flat cash-back cards may be simpler for general spending.",
-  },
-];
+const defaultCreditCards = [];
 
 const familyMembers = [
   {
     id: "me",
-    name: "Naval",
-    age: 46,
-    email: "navalvaidya@gmail.com",
-    phone: "925-416-9453",
+    name: "Parent 1",
+    age: "",
+    email: "",
+    phone: "",
     color: "#0f766e",
-    pin: "1980",
+    pin: "",
     settings: { reminderDays: 7, includeInDigest: true },
   },
   {
     id: "wife",
-    name: "Priyanka",
-    age: 43,
-    email: "priyanka.naval.vaidya@gmail.com",
-    phone: "925-319-7641",
+    name: "Parent 2",
+    age: "",
+    email: "",
+    phone: "",
     color: "#4754a3",
-    pin: "1983",
+    pin: "",
     settings: { reminderDays: 7, includeInDigest: true },
   },
   {
     id: "son",
-    name: "Vivan",
-    age: 16,
-    email: "vivaanvaidya@gmail.com",
-    phone: "925-319-8191",
+    name: "Teen",
+    age: "",
+    email: "",
+    phone: "",
     color: "#d95f43",
-    pin: "2010",
+    pin: "",
     settings: { reminderDays: 5, includeInDigest: true },
   },
   {
     id: "daughter",
-    name: "Yuvika",
-    age: 9,
-    email: "yuvikavaidya@gmail.com",
+    name: "Child",
+    age: "",
+    email: "",
     phone: "",
     color: "#237a57",
-    pin: "2017",
+    pin: "",
     settings: { reminderDays: 3, includeInDigest: true },
   },
 ];
@@ -150,7 +96,7 @@ const isoToday = toISODate(today);
 
 let state = loadState();
 let activeStatus = "all";
-let activeMainView = "tasks";
+let activeMainView = "home";
 let activeTaskMemberId = "all";
 let activeWishMemberId = state.currentMemberId || "me";
 let selectedTaskId = null;
@@ -170,6 +116,11 @@ const elements = {
   loginBtn: document.querySelector("#loginBtn"),
   memberStrip: document.querySelector("#memberStrip"),
   mainTabs: document.querySelector("#mainTabs"),
+  homeView: document.querySelector("#homeView"),
+  homeEyebrow: document.querySelector("#homeEyebrow"),
+  homeTitle: document.querySelector("#homeTitle"),
+  homeDashboard: document.querySelector("#homeDashboard"),
+  homeNewTaskBtn: document.querySelector("#homeNewTaskBtn"),
   taskView: document.querySelector("#taskView"),
   taskSupportView: document.querySelector("#taskSupportView"),
   wishlistView: document.querySelector("#wishlistView"),
@@ -274,7 +225,17 @@ const elements = {
   accountSummary: document.querySelector("#accountSummary"),
   closeAccountBtn: document.querySelector("#closeAccountBtn"),
   accountSyncBtn: document.querySelector("#accountSyncBtn"),
+  accountFamilyBtn: document.querySelector("#accountFamilyBtn"),
   accountSettingsBtn: document.querySelector("#accountSettingsBtn"),
+  familyDialog: document.querySelector("#familyDialog"),
+  familyForm: document.querySelector("#familyForm"),
+  closeFamilyDialogBtn: document.querySelector("#closeFamilyDialogBtn"),
+  joinFamilyBtn: document.querySelector("#joinFamilyBtn"),
+  familyNameInput: document.querySelector("#familyNameInput"),
+  familyIdInput: document.querySelector("#familyIdInput"),
+  familyEmailsInput: document.querySelector("#familyEmailsInput"),
+  familyHomeAddressInput: document.querySelector("#familyHomeAddressInput"),
+  familySetupStatus: document.querySelector("#familySetupStatus"),
   cloudDialog: document.querySelector("#cloudDialog"),
   cloudForm: document.querySelector("#cloudForm"),
   cloudSummary: document.querySelector("#cloudSummary"),
@@ -345,8 +306,10 @@ function loadState() {
   if (saved) {
     try {
       const parsed = JSON.parse(saved);
+      const members = normalizeMembers(parsed.members);
       return {
-        members: normalizeMembers(parsed.members),
+        family: normalizeFamilyProfile(parsed.family, members),
+        members,
         tasks: normalizeTasks(parsed.tasks?.length ? parsed.tasks : seedTasks()),
         notes: normalizeNotes(parsed.notes),
         trips: normalizeTrips(parsed.trips),
@@ -361,6 +324,7 @@ function loadState() {
   }
 
   return {
+    family: normalizeFamilyProfile(),
     members: normalizeMembers(),
     tasks: normalizeTasks(seedTasks()),
     notes: normalizeNotes(),
@@ -396,6 +360,22 @@ function normalizeMembers(savedMembers = []) {
   });
 }
 
+function normalizeFamilyProfile(family = {}, members = familyMembers) {
+  const memberEmails = members.map((member) => normalizeEmail(member.email)).filter(Boolean);
+  const ownerEmail = normalizeEmail(family.ownerEmail) || memberEmails[0] || "";
+  const allowedEmails = [...new Set([ownerEmail, ...(Array.isArray(family.allowedEmails) ? family.allowedEmails : memberEmails)].map(normalizeEmail).filter(Boolean))];
+  return {
+    id: String(family.id || getActiveFamilyId()).trim(),
+    name: String(family.name || "My Family").trim(),
+    ownerEmail,
+    allowedEmails,
+    homeAddress: String(family.homeAddress || "").trim(),
+    plan: family.plan || "prototype",
+    createdAt: family.createdAt || new Date().toISOString(),
+    updatedAt: family.updatedAt || family.createdAt || new Date().toISOString(),
+  };
+}
+
 function normalizeTasks(tasks = []) {
   return tasks.map((task) => {
     const requester = getKnownMemberId(task.requester) || "me";
@@ -407,8 +387,8 @@ function normalizeTasks(tasks = []) {
       comments: Array.isArray(task.comments) ? task.comments : [],
       title:
         {
-          "Review daughter's iPad ask": "Review Yuvika's iPad ask",
-          "Son driving practice plan": "Vivan driving practice plan",
+          "Review daughter's iPad ask": "Review child's tablet ask",
+          "Son driving practice plan": "Teen driving practice plan",
         }[task.title] ?? task.title,
     };
   });
@@ -552,11 +532,17 @@ function normalizeExpenses(expenses = []) {
 }
 
 function normalizeCreditCards(savedCards = []) {
-  return defaultCreditCards.map((defaultCard) => {
-    const saved = Array.isArray(savedCards) ? savedCards.find((card) => card.id === defaultCard.id) : null;
+  const cards = Array.isArray(savedCards) && savedCards.length ? savedCards : defaultCreditCards;
+  return cards.map((card) => {
+    const defaultCard = defaultCreditCards.find((item) => item.id === card.id) || {};
+    const saved = Array.isArray(savedCards) ? savedCards.find((item) => item.id === card.id) || card : card;
     const migratedDueDay = saved?.dueDay || (saved?.dueDate ? parseLocalDate(saved.dueDate).getDate() : "");
     return {
       ...defaultCard,
+      id: saved.id || crypto.randomUUID(),
+      issuer: String(saved.issuer || defaultCard.issuer || "").trim(),
+      name: String(saved.name || defaultCard.name || "Credit card").trim(),
+      recommendedUsage: String(saved.recommendedUsage || defaultCard.recommendedUsage || "").trim(),
       billAmount: normalizeExpenseAmount(saved?.billAmount),
       dueDay: normalizeDueDay(migratedDueDay),
       paidMonth: saved?.paidMonth || "",
@@ -599,69 +585,14 @@ function normalizeDueDay(day) {
 }
 
 function seedTasks() {
-  return [
-    {
-      id: crypto.randomUUID(),
-      title: "Review Yuvika's iPad ask",
-      type: "ask",
-      status: "discussion",
-      requester: "daughter",
-      assignee: "",
-      dueDate: addDays(isoToday, 5),
-      priority: "normal",
-      description: "Understand why she wants it, budget range, school needs, and screen-time rules.",
-      comments: [
-        {
-          id: crypto.randomUUID(),
-          author: "daughter",
-          createdAt: new Date().toISOString(),
-          text: "I want one for drawing and school games.",
-        },
-        {
-          id: crypto.randomUUID(),
-          author: "me",
-          createdAt: new Date().toISOString(),
-          text: "Let's collect requirements before deciding.",
-        },
-      ],
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    },
-    {
-      id: crypto.randomUUID(),
-      title: "Vivan driving practice plan",
-      type: "todo",
-      status: "assigned",
-      requester: "son",
-      assignee: "me",
-      dueDate: addDays(isoToday, 2),
-      priority: "high",
-      description: "Pick two practice windows, confirm route, and add a parent reminder.",
-      comments: [],
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    },
-    {
-      id: crypto.randomUUID(),
-      title: "Family dentist appointment",
-      type: "appointment",
-      status: "todo",
-      requester: "wife",
-      assignee: "wife",
-      dueDate: addDays(isoToday, 11),
-      priority: "normal",
-      description: "Call the dentist and find one block for all four appointments.",
-      comments: [],
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    },
-  ];
+  return [];
 }
 
 function bindEvents() {
   elements.currentProfileBtn.addEventListener("click", openAccountDialog);
   elements.loginBtn?.addEventListener("click", () => openLoginDialog());
   elements.newTaskBtn.addEventListener("click", () => openTaskDialog());
+  elements.homeNewTaskBtn.addEventListener("click", () => openTaskDialog());
   elements.newWishBtn.addEventListener("click", () => openWishDialog());
   elements.newTripBtn.addEventListener("click", () => openTripDialog());
   elements.vacationPrevMonthBtn.addEventListener("click", () => changeVacationMonth(-1));
@@ -748,6 +679,10 @@ function bindEvents() {
     closeAccountDialog();
     openCloudDialog();
   });
+  elements.accountFamilyBtn.addEventListener("click", () => {
+    closeAccountDialog();
+    openFamilyDialog();
+  });
   elements.accountSettingsBtn.addEventListener("click", () => {
     closeAccountDialog();
     openProfileDialog();
@@ -757,6 +692,12 @@ function bindEvents() {
   });
 
   elements.cloudForm.addEventListener("submit", (event) => event.preventDefault());
+  elements.familyForm.addEventListener("submit", saveFamilySettings);
+  elements.joinFamilyBtn.addEventListener("click", joinFamilyWorkspace);
+  elements.closeFamilyDialogBtn.addEventListener("click", closeFamilyDialog);
+  elements.familyDialog.addEventListener("click", (event) => {
+    if (event.target === elements.familyDialog) closeFamilyDialog();
+  });
   elements.authGoogleBtn.addEventListener("click", signInWithGoogle);
   elements.closeCloudBtn.addEventListener("click", closeCloudDialog);
   elements.cloudGoogleBtn.addEventListener("click", signInWithGoogle);
@@ -799,6 +740,7 @@ function createCloudState() {
     user: null,
     auth: null,
     db: null,
+    familyId: "",
     familyRef: null,
     unsubscribe: null,
     applyingRemote: false,
@@ -863,8 +805,30 @@ function isFirebaseConfigured() {
   );
 }
 
+function getActiveFamilyId() {
+  return localStorage.getItem(FAMILY_ID_KEY) || window.FAMILY_HUB_FIREBASE_OPTIONS?.familyId || "default-family";
+}
+
+function setActiveFamilyId(familyId) {
+  const normalized = normalizeFamilyId(familyId);
+  localStorage.setItem(FAMILY_ID_KEY, normalized);
+  if (state.family) state.family.id = normalized;
+  return normalized;
+}
+
+function normalizeFamilyId(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9-]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 60) || "default-family";
+}
+
 function subscribeToFamilyDoc() {
-  const familyId = window.FAMILY_HUB_FIREBASE_OPTIONS?.familyId || "default-family";
+  const familyId = getActiveFamilyId();
+  if (cloudState.familyId === familyId && cloudState.unsubscribe) return;
+  cloudState.familyId = familyId;
   cloudState.familyRef = cloudState.db.collection("families").doc(familyId);
   cloudState.unsubscribe = cloudState.familyRef.onSnapshot(
     (snapshot) => {
@@ -889,6 +853,7 @@ function applyRemoteFamilyData(data = {}) {
   const members = normalizeMembers(data.members);
   const signedInMemberId = memberIdForGoogleUser(cloudState.user, members);
   state = {
+    family: normalizeFamilyProfile(data.family || data, members),
     members,
     tasks: normalizeTasks(data.tasks?.length ? data.tasks : []),
     notes: normalizeNotes(data.notes),
@@ -948,6 +913,18 @@ function saveCloudState(force = false) {
   if ((!force && cloudState.applyingRemote) || !cloudState.enabled || !cloudState.user || !cloudState.familyRef) return;
 
   const payload = {
+    family: normalizeFamilyProfile(
+      {
+        ...state.family,
+        id: getActiveFamilyId(),
+        ownerEmail: state.family?.ownerEmail || cloudState.user.email || "",
+        allowedEmails: familyAllowedEmails(),
+        updatedAt: new Date().toISOString(),
+      },
+      state.members,
+    ),
+    allowedEmails: familyAllowedEmails(),
+    ownerEmail: state.family?.ownerEmail || cloudState.user.email || "",
     members: state.members,
     tasks: state.tasks,
     notes: state.notes,
@@ -964,6 +941,18 @@ function saveCloudState(force = false) {
     renderCloudStatus();
     renderCloudDialog();
   });
+}
+
+function familyAllowedEmails() {
+  return [
+    state.family?.ownerEmail,
+    ...(Array.isArray(state.family?.allowedEmails) ? state.family.allowedEmails : []),
+    ...state.members.map((member) => member.email),
+    cloudState.user?.email,
+  ]
+    .map(normalizeEmail)
+    .filter(Boolean)
+    .filter((email, index, list) => list.indexOf(email) === index);
 }
 
 function renderCloudStatus() {
@@ -994,7 +983,7 @@ function openCloudDialog() {
 function renderCloudDialog() {
   if (!elements.cloudSummary) return;
 
-  const familyId = window.FAMILY_HUB_FIREBASE_OPTIONS?.familyId || "default-family";
+  const familyId = getActiveFamilyId();
   if (!cloudState.configured) {
     elements.cloudSummary.innerHTML = `
       <strong>Local mode</strong>
@@ -1048,7 +1037,7 @@ function renderAccountDialog() {
       <span class="avatar" style="background:${member.color}">${initials(member.name)}</span>
       <div>
         <strong>${escapeHTML(member.name)}</strong>
-        <span>${escapeHTML(syncStatusDetail())}</span>
+        <span>${escapeHTML(state.family?.name || "My Family")} · ${escapeHTML(syncStatusDetail())}</span>
       </div>
     </div>
   `;
@@ -1057,6 +1046,81 @@ function renderAccountDialog() {
 function closeAccountDialog() {
   elements.accountDialog.close();
   elements.accountForm.reset();
+}
+
+function openFamilyDialog() {
+  const family = normalizeFamilyProfile(state.family, state.members);
+  elements.familyNameInput.value = family.name;
+  elements.familyIdInput.value = getActiveFamilyId();
+  elements.familyEmailsInput.value = familyAllowedEmails().join("\n");
+  elements.familyHomeAddressInput.value = family.homeAddress || "";
+  elements.familySetupStatus.textContent = "";
+  elements.familyDialog.showModal();
+  elements.familyNameInput.focus();
+  refreshIcons();
+}
+
+function closeFamilyDialog() {
+  elements.familyDialog.close();
+  elements.familyForm.reset();
+  elements.familySetupStatus.textContent = "";
+}
+
+function saveFamilySettings(event) {
+  event.preventDefault();
+  const familyId = setActiveFamilyId(elements.familyIdInput.value || elements.familyNameInput.value);
+  const allowedEmails = parseEmailList(elements.familyEmailsInput.value);
+  const signedInEmail = normalizeEmail(cloudState.user?.email);
+  state.family = normalizeFamilyProfile(
+    {
+      ...state.family,
+      id: familyId,
+      name: elements.familyNameInput.value.trim() || "My Family",
+      ownerEmail: state.family?.ownerEmail || signedInEmail || allowedEmails[0] || "",
+      allowedEmails: [...new Set([signedInEmail, ...allowedEmails].filter(Boolean))],
+      homeAddress: elements.familyHomeAddressInput.value.trim(),
+      updatedAt: new Date().toISOString(),
+    },
+    state.members,
+  );
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  localStorage.setItem(LOCAL_PROFILE_KEY, state.currentMemberId);
+  resubscribeToActiveFamily();
+  saveCloudState(true);
+  closeFamilyDialog();
+  render();
+}
+
+function joinFamilyWorkspace() {
+  const familyId = setActiveFamilyId(elements.familyIdInput.value || elements.familyNameInput.value);
+  state.family = normalizeFamilyProfile(
+    {
+      ...state.family,
+      id: familyId,
+      name: elements.familyNameInput.value.trim() || state.family?.name || "My Family",
+      allowedEmails: parseEmailList(elements.familyEmailsInput.value),
+      homeAddress: elements.familyHomeAddressInput.value.trim(),
+      updatedAt: new Date().toISOString(),
+    },
+    state.members,
+  );
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  resubscribeToActiveFamily();
+  closeFamilyDialog();
+  render();
+}
+
+function parseEmailList(value) {
+  return [...new Set(String(value || "").split(/[\s,;]+/).map(normalizeEmail).filter(Boolean))];
+}
+
+function resubscribeToActiveFamily() {
+  if (!cloudState.enabled || !cloudState.user || !cloudState.db) return;
+  if (cloudState.unsubscribe) {
+    cloudState.unsubscribe();
+    cloudState.unsubscribe = null;
+  }
+  subscribeToFamilyDoc();
 }
 
 function signInWithGoogle() {
@@ -1108,6 +1172,7 @@ function render() {
   renderCloudStatus();
   renderCurrentProfile();
   renderMainTabs();
+  renderHomeDashboard();
   renderWishes();
   renderTrips();
   renderFinance();
@@ -1123,6 +1188,7 @@ function render() {
 }
 
 function saveState() {
+  state.family = normalizeFamilyProfile(state.family, state.members);
   state.tasks = normalizeTasks(state.tasks);
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   localStorage.setItem(LOCAL_PROFILE_KEY, state.currentMemberId);
@@ -1171,6 +1237,7 @@ function renderMainTabs() {
       const count =
         {
           tasks: state.tasks.filter((task) => task.status !== "done").length,
+          home: getHomeAttentionCount(),
           wishlist: state.wishes.filter((wish) => wish.status !== "done").length,
           vacation: state.trips.length,
           finance: getExpensesForFinanceMonth().length,
@@ -1185,6 +1252,7 @@ function renderMainTabs() {
     })
     .join("");
 
+  elements.homeView.hidden = activeMainView !== "home";
   elements.taskView.hidden = activeMainView !== "tasks";
   elements.taskSupportView.hidden = activeMainView !== "tasks";
   elements.wishlistView.hidden = activeMainView !== "wishlist";
@@ -1198,6 +1266,70 @@ function renderMainTabs() {
       refreshIcons();
     });
   });
+}
+
+function renderHomeDashboard() {
+  const activeTasks = getSortedTasks().filter((task) => task.status !== "done");
+  const dueSoon = activeTasks.filter((task) => {
+    const days = daysUntil(task.dueDate);
+    return days <= 7;
+  });
+  const overdue = activeTasks.filter((task) => daysUntil(task.dueDate) < 0);
+  const upcomingTrips = state.trips
+    .filter((trip) => trip.endDate >= isoToday)
+    .sort((a, b) => a.startDate.localeCompare(b.startDate))
+    .slice(0, 4);
+  const activeWishes = getSortedWishes().filter((wish) => wish.status !== "done").slice(0, 4);
+  const expenses = getExpensesForFinanceMonth();
+  const familyName = state.family?.name || "Family Hub";
+
+  elements.homeEyebrow.textContent = familyName;
+  elements.homeTitle.textContent = "Today";
+  elements.homeDashboard.innerHTML = `
+    <section class="home-card home-card-wide">
+      <div>
+        <p class="eyebrow">Attention</p>
+        <h3>${dueSoon.length} due soon</h3>
+        <p>${overdue.length ? `${overdue.length} overdue item${overdue.length === 1 ? "" : "s"} need attention.` : "No overdue tasks right now."}</p>
+      </div>
+      <button class="secondary-button" type="button" data-home-view="tasks"><i data-lucide="calendar-days"></i>Open tasks</button>
+    </section>
+    ${renderHomeListCard("Upcoming tasks", dueSoon.slice(0, 5), (task) => `${task.title} · ${memberName(task.assignee)} · ${formatShortDate(task.dueDate)}`, "tasks")}
+    ${renderHomeListCard("Wishlist", activeWishes, (wish) => `${wish.title} · ${memberName(wish.owner)}`, "wishlist")}
+    ${renderHomeListCard("Vacation", upcomingTrips, (trip) => `${trip.title} · ${formatTripRange(trip)}`, "vacation")}
+    <section class="home-card">
+      <p class="eyebrow">Finance</p>
+      <h3>${formatMoney(sumExpenses(expenses))}</h3>
+      <p>${expenses.length} expense${expenses.length === 1 ? "" : "s"} in ${financeMonthName()}.</p>
+      <button class="secondary-button" type="button" data-home-view="finance"><i data-lucide="wallet-cards"></i>Open finance</button>
+    </section>
+  `;
+
+  elements.homeDashboard.querySelectorAll("[data-home-view]").forEach((button) => {
+    button.addEventListener("click", () => {
+      activeMainView = button.dataset.homeView;
+      renderMainTabs();
+      refreshIcons();
+    });
+  });
+}
+
+function renderHomeListCard(title, items, formatter, targetView) {
+  return `
+    <section class="home-card">
+      <p class="eyebrow">${escapeHTML(title)}</p>
+      ${
+        items.length
+          ? `<ul class="home-list">${items.map((item) => `<li>${escapeHTML(formatter(item))}</li>`).join("")}</ul>`
+          : `<p>No items yet.</p>`
+      }
+      <button class="secondary-button" type="button" data-home-view="${targetView}">Open ${escapeHTML(title.toLowerCase())}</button>
+    </section>
+  `;
+}
+
+function getHomeAttentionCount() {
+  return state.tasks.filter((task) => task.status !== "done" && daysUntil(task.dueDate) <= 7).length;
 }
 
 function renderWishes() {
@@ -2134,6 +2266,12 @@ function renderCreditCards() {
   }
 
   const canEdit = isAdminMember();
+  if (!state.creditCards.length) {
+    elements.financeCreditCardList.innerHTML = `<div class="empty-state compact">No credit cards added yet.</div>`;
+    refreshIcons();
+    return;
+  }
+
   elements.financeCreditCardList.innerHTML = state.creditCards
     .map(
       (card) => {
@@ -2371,7 +2509,7 @@ function updateCreditCardField(event) {
   if (!card) return;
   if (!isAdminMember()) {
     event.currentTarget.value = event.currentTarget.defaultValue;
-    window.alert("Only Naval can edit credit card settings and payments.");
+    window.alert("Only the family admin can edit credit card settings and payments.");
     return;
   }
 
@@ -2391,7 +2529,7 @@ function updateCreditCardField(event) {
 
 function toggleCreditCardPaid(cardId) {
   if (!isAdminMember()) {
-    window.alert("Only Naval can change credit card payment status.");
+    window.alert("Only the family admin can change credit card payment status.");
     return;
   }
 
@@ -3414,7 +3552,7 @@ function answerFamilyQuestion(question) {
     return formatFamilySummary(activeTasks);
   }
 
-  return "I did not find a matching task or person. Try asking “what is due this week?”, “who owns dentist?”, “summarize Vivan's tasks”, or “show unassigned tasks”.";
+  return "I did not find a matching task or person. Try asking “what is due this week?”, “who owns dentist?”, “summarize teen tasks”, or “show unassigned tasks”.";
 }
 
 function findMentionedMember(text) {
@@ -3528,7 +3666,7 @@ function createTaskFromNotebookQuestion(text, member) {
 function createTasksFromRoughList(question) {
   const drafts = parseRoughTaskList(question);
   if (!drafts.length) {
-    return "Paste one task per line with a date, like:\n- Dentist appointment 5/20\n- Vivan driving practice tomorrow\n- Buy birthday gift by May 30";
+    return "Paste one task per line with a date, like:\n- Dentist appointment 5/20\n- Driving practice tomorrow\n- Buy birthday gift by May 30";
   }
 
   const now = new Date().toISOString();
@@ -4899,7 +5037,7 @@ function renderTripMapLinks(trip) {
 
 function getTripMapPoints(trip) {
   const points = [
-    HOME_ADDRESS,
+    state.family?.homeAddress,
     trip.destination,
     ...trip.hotels.map((hotel) => hotel.address || hotel.name),
     ...trip.days.flatMap((day) =>
