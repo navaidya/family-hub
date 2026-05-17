@@ -24,16 +24,56 @@
   <body class="auth-loading">
     <section class="auth-gate" id="authGate" aria-label="Family Hub sign in">
       <div class="auth-card">
-        <div>
-          <p class="eyebrow">Shared family data</p>
-          <h1>Family Hub</h1>
-          <p>Sign in with your family Google account to open tasks, calendar, notebooks, and reminders.</p>
+        <div class="auth-copy">
+          <div class="auth-brand">
+            <span class="auth-mark" aria-hidden="true"><i data-lucide="home"></i></span>
+            <div>
+              <p class="eyebrow">Private family workspace</p>
+              <h1>Family Hub</h1>
+            </div>
+          </div>
+          <p class="auth-lede">
+            One shared place for tasks, wishes, vacation plans, finance reminders, notebooks, and family conversations.
+          </p>
+          <div class="auth-feature-grid" aria-label="Family Hub sections">
+            <div class="auth-feature">
+              <i data-lucide="check-circle-2"></i>
+              <span>Tasks</span>
+              <small>Owners, due dates, and progress</small>
+            </div>
+            <div class="auth-feature">
+              <i data-lucide="sparkles"></i>
+              <span>Wishlist</span>
+              <small>Ideas, wishes, and discussion</small>
+            </div>
+            <div class="auth-feature">
+              <i data-lucide="map"></i>
+              <span>Vacation</span>
+              <small>Trips, stops, hotels, and maps</small>
+            </div>
+            <div class="auth-feature">
+              <i data-lucide="wallet-cards"></i>
+              <span>Finance</span>
+              <small>Bills, cards, and reminders</small>
+            </div>
+          </div>
         </div>
-        <button class="google-button auth-google-button" id="authGoogleBtn" type="button">
-          <i data-lucide="chrome"></i>
-          Sign in with Google
-        </button>
-        <p class="form-error" id="authStatus"></p>
+        <div class="auth-panel">
+          <div class="auth-panel-heading">
+            <p class="eyebrow">Secure sign in</p>
+            <h2>Welcome back</h2>
+            <p>Use your approved family Google account to open the shared hub.</p>
+          </div>
+          <button class="google-button auth-google-button" id="authGoogleBtn" type="button">
+            <span class="google-mark" aria-hidden="true">G</span>
+            Sign in with Google
+          </button>
+          <div class="auth-trust-row">
+            <span><i data-lucide="shield-check"></i> Family-only access</span>
+            <span><i data-lucide="refresh-cw"></i> Synced across devices</span>
+          </div>
+          <p class="form-error" id="authStatus" role="status"></p>
+        </div>
       </div>
     </section>
 

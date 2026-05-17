@@ -149,6 +149,21 @@ label.import-button {
   opacity: 0.55;
 }
 
+.google-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  color: #1a73e8;
+  background: white;
+  font-size: 0.86rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
 .profile-button:hover {
   background: #f8fafc;
 }
@@ -221,9 +236,12 @@ label.import-button {
 
 .auth-gate {
   display: none;
-  min-height: 100vh;
-  padding: clamp(20px, 5vw, 56px);
+  min-height: 100svh;
+  padding: clamp(18px, 5vw, 56px);
   place-items: center;
+  background:
+    linear-gradient(135deg, rgba(15, 118, 110, 0.13), rgba(71, 84, 163, 0.08) 48%, rgba(217, 95, 67, 0.07)),
+    linear-gradient(180deg, #fbfcfd 0%, #eef4f6 100%);
 }
 
 .auth-loading .auth-gate,
@@ -240,23 +258,64 @@ label.import-button {
 
 .auth-card {
   display: grid;
-  gap: 18px;
-  width: min(560px, 100%);
-  padding: clamp(22px, 5vw, 42px);
+  grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.9fr);
+  width: min(1040px, 100%);
+  overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.96);
-  box-shadow: var(--shadow);
+  background: rgba(255, 255, 255, 0.97);
+  box-shadow: 0 24px 70px rgba(24, 33, 47, 0.14);
 }
 
 .auth-card h1,
+.auth-card h2,
 .auth-card p {
   margin: 0;
 }
 
+.auth-copy {
+  display: grid;
+  align-content: center;
+  gap: clamp(22px, 4vw, 34px);
+  min-height: 580px;
+  padding: clamp(28px, 6vw, 58px);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.74), rgba(255, 255, 255, 0.9)),
+    linear-gradient(135deg, rgba(15, 118, 110, 0.12), rgba(183, 121, 31, 0.08));
+}
+
+.auth-brand {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.auth-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 58px;
+  height: 58px;
+  border-radius: 8px;
+  color: white;
+  background: var(--teal);
+  box-shadow: 0 12px 30px rgba(15, 118, 110, 0.24);
+}
+
+.auth-mark svg {
+  width: 28px;
+  height: 28px;
+}
+
 .auth-card h1 {
-  font-size: clamp(2.2rem, 8vw, 4.8rem);
+  font-size: clamp(2.5rem, 6vw, 5rem);
   line-height: 0.95;
+  letter-spacing: 0;
+}
+
+.auth-card h2 {
+  font-size: clamp(1.65rem, 4vw, 2.35rem);
+  line-height: 1;
   letter-spacing: 0;
 }
 
@@ -266,12 +325,97 @@ label.import-button {
   line-height: 1.5;
 }
 
+.auth-lede {
+  max-width: 560px;
+  color: #405064;
+  font-size: clamp(1rem, 2vw, 1.16rem);
+}
+
+.auth-feature-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.auth-feature {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 3px 10px;
+  min-height: 92px;
+  padding: 14px;
+  border: 1px solid rgba(217, 224, 232, 0.9);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.8);
+}
+
+.auth-feature svg {
+  grid-row: span 2;
+  width: 20px;
+  height: 20px;
+  color: var(--teal);
+}
+
+.auth-feature span {
+  font-weight: 900;
+}
+
+.auth-feature small {
+  color: var(--muted);
+  font-size: 0.84rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.auth-panel {
+  display: grid;
+  align-content: center;
+  gap: 18px;
+  padding: clamp(26px, 5vw, 48px);
+  border-left: 1px solid var(--line);
+  background: #fbfcfe;
+}
+
+.auth-panel-heading {
+  display: grid;
+  gap: 10px;
+}
+
 .auth-card .form-error {
+  min-height: 22px;
   color: var(--red);
+  font-weight: 800;
 }
 
 .auth-google-button {
+  width: 100%;
   min-height: 52px;
+  padding: 0 18px;
+  font-size: 1rem;
+  box-shadow: 0 10px 24px rgba(24, 33, 47, 0.08);
+}
+
+.auth-trust-row {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: white;
+}
+
+.auth-trust-row span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #405064;
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+.auth-trust-row svg {
+  width: 17px;
+  height: 17px;
+  color: var(--green);
 }
 
 .app-shell {
@@ -2027,6 +2171,58 @@ label.import-button {
     background:
       linear-gradient(180deg, rgba(15, 118, 110, 0.06), transparent 220px),
       var(--bg);
+  }
+
+  .auth-gate {
+    align-items: stretch;
+    min-height: 100svh;
+    padding: max(14px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) max(14px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left));
+  }
+
+  .auth-card {
+    grid-template-columns: 1fr;
+    align-self: center;
+  }
+
+  .auth-copy {
+    min-height: auto;
+    gap: 18px;
+    padding: 22px;
+  }
+
+  .auth-brand {
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .auth-mark {
+    width: 48px;
+    height: 48px;
+  }
+
+  .auth-card h1 {
+    font-size: clamp(2.4rem, 12vw, 3.8rem);
+  }
+
+  .auth-lede {
+    font-size: 1rem;
+  }
+
+  .auth-feature-grid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .auth-feature {
+    min-height: 72px;
+    padding: 12px;
+  }
+
+  .auth-panel {
+    gap: 14px;
+    padding: 20px 22px 22px;
+    border-top: 1px solid var(--line);
+    border-left: 0;
   }
 
   .app-header,
