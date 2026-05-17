@@ -44,14 +44,14 @@
       </div>
       <div class="header-actions">
         <button class="profile-button" id="currentProfileBtn" type="button"></button>
-        <button class="secondary-button" id="loginBtn" type="button">
+        <button class="secondary-button" id="loginBtn" type="button" hidden>
           <i data-lucide="user-round-cog"></i>
           Switch
         </button>
-        <button class="icon-button" id="exportBtn" type="button" title="Export backup" aria-label="Export backup">
+        <button class="icon-button" id="exportBtn" type="button" title="Export backup" aria-label="Export backup" hidden>
           <i data-lucide="download">↓</i>
         </button>
-        <label class="icon-button import-button" title="Import backup" aria-label="Import backup">
+        <label class="icon-button import-button" title="Import backup" aria-label="Import backup" hidden>
           <i data-lucide="upload">↑</i>
           <input id="importInput" type="file" accept="application/json" />
         </label>
@@ -59,7 +59,7 @@
     </header>
 
     <main class="app-shell">
-      <section class="member-strip" id="memberStrip" aria-label="Family members"></section>
+      <section class="member-strip" id="memberStrip" aria-label="Family members" hidden></section>
 
       <nav class="main-tabs" id="mainTabs" aria-label="Main sections"></nav>
 
@@ -209,7 +209,7 @@
             </div>
           </div>
 
-          <nav class="segmented-control" id="statusTabs" aria-label="Task status filters"></nav>
+          <nav class="segmented-control member-filter-tabs" id="statusTabs" aria-label="Task member filters"></nav>
           <div class="task-list" id="taskList"></div>
         </section>
 

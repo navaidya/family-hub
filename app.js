@@ -151,6 +151,7 @@ const isoToday = toISODate(today);
 let state = loadState();
 let activeStatus = "all";
 let activeMainView = "tasks";
+let activeTaskMemberId = state.currentMemberId || "me";
 let activeWishMemberId = state.currentMemberId || "me";
 let selectedTaskId = state.tasks[0]?.id ?? null;
 let selectedTripId = state.trips?.[0]?.id ?? null;
@@ -370,16 +371,21 @@ function normalizeMembers(savedMembers = []) {
 }
 
 function normalizeTasks(tasks = []) {
-  return tasks.map((task) => ({
-    ...task,
-    recurrence: ["none", "monthly"].includes(task.recurrence) ? task.recurrence : "none",
-    comments: Array.isArray(task.comments) ? task.comments : [],
-    title:
-      {
-        "Review daughter's iPad ask": "Review Yuvika's iPad ask",
-        "Son driving practice plan": "Vivan driving practice plan",
-      }[task.title] ?? task.title,
-  }));
+  return tasks.map((task) => {
+    const requester = getKnownMemberId(task.requester) || "me";
+    return {
+      ...task,
+      requester,
+      assignee: getKnownMemberId(task.assignee) || requester,
+      recurrence: ["none", "monthly"].includes(task.recurrence) ? task.recurrence : "none",
+      comments: Array.isArray(task.comments) ? task.comments : [],
+      title:
+        {
+          "Review daughter's iPad ask": "Review Yuvika's iPad ask",
+          "Son driving practice plan": "Vivan driving practice plan",
+        }[task.title] ?? task.title,
+    };
+  });
 }
 
 function normalizeNotes(notes = {}) {
@@ -628,7 +634,7 @@ function seedTasks() {
 
 function bindEvents() {
   elements.currentProfileBtn.addEventListener("click", openAccountDialog);
-  elements.loginBtn.addEventListener("click", () => openLoginDialog());
+  elements.loginBtn?.addEventListener("click", () => openLoginDialog());
   elements.newTaskBtn.addEventListener("click", () => openTaskDialog());
   elements.newWishBtn.addEventListener("click", () => openWishDialog());
   elements.newTripBtn.addEventListener("click", () => openTripDialog());
@@ -655,8 +661,8 @@ function bindEvents() {
   elements.wishForm.addEventListener("submit", saveWishFromForm);
   elements.deleteWishBtn.addEventListener("click", deleteCurrentWish);
   elements.searchInput.addEventListener("input", renderTasks);
-  elements.exportBtn.addEventListener("click", exportState);
-  elements.importInput.addEventListener("change", importState);
+  elements.exportBtn?.addEventListener("click", exportState);
+  elements.importInput?.addEventListener("change", importState);
   elements.emailDigestBtn.addEventListener("click", sendDigestEmail);
   elements.notebookForm.addEventListener("submit", addNotebookNote);
   elements.prevMonthBtn.addEventListener("click", () => changeMonth(-1));
@@ -860,6 +866,10 @@ function applyRemoteFamilyData(data = {}) {
     selectedTaskId = state.tasks[0]?.id ?? null;
   }
 
+  if (!getMember(activeTaskMemberId)) {
+    activeTaskMemberId = state.currentMemberId || state.members[0]?.id || "me";
+  }
+
   if (!state.trips.some((trip) => trip.id === selectedTripId)) {
     selectedTripId = state.trips[0]?.id ?? null;
   }
@@ -879,6 +889,7 @@ function applySignedInProfile(user) {
   if (!memberId || state.currentMemberId === memberId) return;
 
   state.currentMemberId = memberId;
+  activeTaskMemberId = memberId;
   activeWishMemberId = memberId;
   localStorage.setItem(LOCAL_PROFILE_KEY, memberId);
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
@@ -1054,7 +1065,6 @@ function firebaseErrorMessage(error) {
 function render() {
   renderCloudStatus();
   renderCurrentProfile();
-  renderMemberStrip();
   renderMainTabs();
   renderWishes();
   renderTrips();
@@ -1071,6 +1081,7 @@ function render() {
 }
 
 function saveState() {
+  state.tasks = normalizeTasks(state.tasks);
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   localStorage.setItem(LOCAL_PROFILE_KEY, state.currentMemberId);
   localStorage.removeItem(LEGACY_STORAGE_KEY);
@@ -2434,6 +2445,7 @@ function loginAsSelectedMember(event) {
   }
 
   state.currentMemberId = member.id;
+  activeTaskMemberId = member.id;
   if (activeMainView === "wishlist") {
     activeWishMemberId = member.id;
     selectedWishId = null;
@@ -2551,23 +2563,28 @@ function closeProfileDialog() {
 }
 
 function renderStatusTabs() {
-  elements.statusTabs.innerHTML = statuses
-    .filter((status) => status.id !== "done")
-    .map((status) => {
-      const count = status.id === "all" ? state.tasks.length : state.tasks.filter((task) => task.status === status.id).length;
+  if (!getMember(activeTaskMemberId)) {
+    activeTaskMemberId = state.currentMemberId || state.members[0]?.id || "me";
+  }
+
+  elements.statusTabs.innerHTML = state.members
+    .map((member) => {
+      const count = state.tasks.filter((task) => task.assignee === member.id && task.status !== "done").length;
       return `
-        <button class="segment ${activeStatus === status.id ? "active" : ""}" type="button" data-status="${status.id}">
-          ${status.label} ${count}
+        <button class="segment ${activeTaskMemberId === member.id ? "active" : ""}" type="button" data-task-member="${member.id}">
+          ${escapeHTML(member.name)} ${count}
         </button>
       `;
     })
     .join("");
 
-  elements.statusTabs.querySelectorAll("[data-status]").forEach((button) => {
+  elements.statusTabs.querySelectorAll("[data-task-member]").forEach((button) => {
     button.addEventListener("click", () => {
-      activeStatus = button.dataset.status;
+      activeTaskMemberId = button.dataset.taskMember;
+      selectedTaskId = null;
       renderStatusTabs();
       renderTasks();
+      renderDetail();
     });
   });
 }
@@ -2583,7 +2600,7 @@ function populateFormOptions() {
     .join("");
 
   form.requester.innerHTML = memberOptions;
-  form.assignee.innerHTML = `<option value="">Unassigned</option>${memberOptions}`;
+  form.assignee.innerHTML = memberOptions;
 
   wishForm.owner.innerHTML = memberOptions;
   wishForm.category.innerHTML = wishCategories
@@ -2597,22 +2614,26 @@ function populateFormOptions() {
 function renderTasks() {
   const query = elements.searchInput.value.trim().toLowerCase();
   const tasks = getSortedTasks().filter((task) => {
-    const matchesStatus = activeStatus === "all" || task.status === activeStatus;
+    const matchesMember = task.assignee === activeTaskMemberId;
     const haystack = [task.title, task.description, task.type, memberName(task.requester), memberName(task.assignee)]
       .join(" ")
       .toLowerCase();
-    return matchesStatus && (!query || haystack.includes(query));
+    return matchesMember && (!query || haystack.includes(query));
   });
 
+  if (!tasks.some((task) => task.id === selectedTaskId)) {
+    selectedTaskId = tasks[0]?.id ?? null;
+  }
+
   if (!tasks.length) {
-    elements.taskList.innerHTML = `<div class="empty-state">No tasks match this view.</div>`;
+    selectedTaskId = null;
+    elements.taskList.innerHTML = `<div class="empty-state">No assigned tasks for ${escapeHTML(memberName(activeTaskMemberId))}.</div>`;
     return;
   }
 
   elements.taskList.innerHTML = tasks
     .map((task) => {
       const dueState = getDueState(task);
-      const assignee = task.assignee ? memberName(task.assignee) : "Unassigned";
       return `
         <button class="task-row ${dueState} ${task.status === "done" ? "done" : ""} ${
           selectedTaskId === task.id ? "selected" : ""
@@ -2624,7 +2645,7 @@ function renderTasks() {
               ${task.priority === "high" ? `<span class="badge high">High</span>` : ""}
               ${task.recurrence === "monthly" ? `<span class="badge repeat"><i data-lucide="rotate-cw"></i>Monthly</span>` : ""}
               <span>${escapeHTML(memberName(task.requester))} asked</span>
-              <span>${escapeHTML(assignee)}</span>
+              <span>${escapeHTML(statusLabel(task.status))}</span>
             </span>
           </span>
           <span class="date-pill">
@@ -2719,7 +2740,6 @@ function renderDetail() {
       <label class="fact inline-fact">
         <span>Assigned to</span>
         <select class="inline-control" data-task-inline="assignee" aria-label="Assigned to">
-          <option value="" ${task.assignee ? "" : "selected"}>Unassigned</option>
           ${renderMemberOptions(task.assignee)}
         </select>
       </label>
@@ -2796,6 +2816,7 @@ function updateTaskInlineField(event) {
 
   const previousStatus = task.status;
   task[field] = value;
+  if (field === "assignee" && !task.assignee) task.assignee = task.requester || state.currentMemberId;
   if (field === "status" && value === "assigned" && !task.assignee) task.assignee = task.requester;
   task.updatedAt = new Date().toISOString();
   if (field === "status") createNextRecurringTask(task, previousStatus);
@@ -3294,7 +3315,7 @@ function createTaskFromNotebookQuestion(text, member) {
   saveState();
   render();
 
-  return `Created task: ${task.title}\nDue: ${formatLongDate(task.dueDate)}\nRequested by: ${member.name}\nAssigned to: Unassigned`;
+  return `Created task: ${task.title}\nDue: ${formatLongDate(task.dueDate)}\nRequested by: ${member.name}\nAssigned to: ${member.name}`;
 }
 
 function createTasksFromRoughList(question) {
@@ -3357,7 +3378,7 @@ function buildTaskFromDraft(draft, now) {
     type: inferTaskType(draft.title),
     status: "todo",
     requester: state.currentMemberId,
-    assignee: draft.assignee,
+    assignee: draft.assignee || state.currentMemberId,
     dueDate: draft.dueDate,
     recurrence: inferRecurrence(draft.original),
     priority: "normal",
@@ -3383,7 +3404,7 @@ function buildTaskFromNote(note, member, question) {
     type: "todo",
     status: "todo",
     requester: member.id,
-    assignee: "",
+    assignee: member.id,
     dueDate: deriveDueDateFromQuestion(question),
     recurrence: inferRecurrence(question),
     priority: "normal",
@@ -3713,7 +3734,7 @@ function openTaskDialog(task = null) {
   form.type.value = task?.type ?? "todo";
   form.status.value = task?.status ?? "todo";
   form.requester.value = task?.requester ?? state.currentMemberId;
-  form.assignee.value = task?.assignee ?? "";
+  form.assignee.value = task?.assignee ?? state.currentMemberId;
   form.dueDate.value = task?.dueDate ?? isoToday;
   form.recurrence.value = task?.recurrence ?? "none";
   form.priority.value = task?.priority ?? "normal";
@@ -3878,7 +3899,7 @@ function saveTaskFromForm(event) {
     type: form.type.value,
     status: form.status.value,
     requester: form.requester.value,
-    assignee: form.assignee.value,
+    assignee: form.assignee.value || form.requester.value || state.currentMemberId,
     dueDate: form.dueDate.value,
     recurrence: form.recurrence.value,
     priority: form.priority.value,
