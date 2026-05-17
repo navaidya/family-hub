@@ -1399,13 +1399,6 @@ function renderTripDetail() {
   if (!trip) return;
 
   const tripMapLinks = renderTripMapLinks(trip);
-  const hotelCards = trip.hotels.length
-    ? trip.hotels.map((hotel) => renderHotelCard(hotel)).join("")
-    : `<div class="empty-state compact">No hotel stays added.</div>`;
-  const dayCards = trip.days.length
-    ? trip.days.map((day) => renderTripDayCard(trip, day)).join("")
-    : `<div class="empty-state compact">No daily plans yet.</div>`;
-
   elements.tripDetail.innerHTML = `
     <div class="trip-detail-stack">
       <div class="trip-hero">
@@ -1425,54 +1418,11 @@ function renderTripDetail() {
         <h3>Trip notes</h3>
         <p class="task-description">${escapeHTML(trip.notes || "No trip notes yet.")}</p>
       </section>
-
-      <section class="trip-section">
-        <div class="section-heading-inline">
-          <h3>Hotel stays</h3>
-        </div>
-        <div class="hotel-list">${hotelCards}</div>
-      </section>
-
-      <section class="trip-section">
-        <div class="section-heading-inline">
-          <h3>Daily plans</h3>
-        </div>
-        <div class="trip-day-list">${dayCards}</div>
-      </section>
     </div>
   `;
 
   elements.tripDetail.querySelector("[data-trip-edit]").addEventListener("click", () => openTripDialog(trip));
-  elements.tripDetail.querySelector("[data-hotel-form]")?.addEventListener("submit", addHotelToTrip);
-  elements.tripDetail.querySelector("[data-day-form]")?.addEventListener("submit", addDayToTrip);
   elements.tripDetail.querySelector("[data-google-maps-import]").addEventListener("submit", importGoogleMapsPlaces);
-  elements.tripDetail.querySelectorAll("[data-hotel-delete]").forEach((button) => {
-    button.addEventListener("click", () => deleteHotelFromTrip(button.dataset.hotelDelete));
-  });
-  elements.tripDetail.querySelectorAll("[data-day-delete]").forEach((button) => {
-    button.addEventListener("click", () => deleteDayFromTrip(button.dataset.dayDelete));
-  });
-  elements.tripDetail.querySelectorAll("[data-stop-delete]").forEach((button) => {
-    button.addEventListener("click", () => deleteStopFromDay(button.dataset.dayId, button.dataset.stopDelete));
-  });
-  elements.tripDetail.querySelectorAll("[data-stop-form]").forEach((formElement) => {
-    formElement.addEventListener("submit", addStopToDay);
-  });
-  elements.tripDetail.querySelectorAll("[data-stop-edit-form]").forEach((formElement) => {
-    formElement.addEventListener("submit", updateTripStop);
-  });
-  elements.tripDetail.querySelectorAll("[data-stop-move]").forEach((select) => {
-    select.addEventListener("change", () => moveStopToDay(select.dataset.dayId, select.dataset.stopMove, select.value));
-  });
-  elements.tripDetail.querySelectorAll("[data-stop-drag]").forEach((card) => {
-    card.addEventListener("dragstart", handleTripStopDragStart);
-    card.addEventListener("dragend", handleTripStopDragEnd);
-  });
-  elements.tripDetail.querySelectorAll("[data-day-drop]").forEach((dropTarget) => {
-    dropTarget.addEventListener("dragover", handleTripStopDragOver);
-    dropTarget.addEventListener("dragleave", handleTripStopDragLeave);
-    dropTarget.addEventListener("drop", handleTripStopDrop);
-  });
   refreshIcons();
 }
 

@@ -842,6 +842,10 @@ label.import-button {
   gap: 10px;
 }
 
+.trip-detail-stack {
+  margin-bottom: 4px;
+}
+
 .trip-list {
   display: flex;
   gap: 8px;
