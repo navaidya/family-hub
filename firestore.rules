@@ -10,6 +10,15 @@ service cloud.firestore {
       return request.auth != null && request.auth.token.email != null;
     }
 
+    function defaultFamilyEmails() {
+      return [
+        "navalvaidya@gmail.com",
+        "priyanka.naval.vaidya@gmail.com",
+        "vivaanvaidya@gmail.com",
+        "yuvikavaidya@gmail.com"
+      ];
+    }
+
     function isExistingFamilyMember(familyId) {
       return isSignedIn()
         && (
@@ -43,19 +52,17 @@ service cloud.firestore {
 
     function isLegacyDefaultFamilyMember(familyId) {
       return familyId == "default-family"
-        && signedInEmail() in [
-          "navalvaidya@gmail.com",
-          "priyanka.naval.vaidya@gmail.com",
-          "vivaanvaidya@gmail.com",
-          "yuvikavaidya@gmail.com"
-        ];
+        && signedInEmail() in defaultFamilyEmails();
     }
 
-    function isCreatingOwnFamily() {
+    function isCreatingOwnFamily(familyId) {
       return isSignedIn()
         && request.resource.data.allowedEmails is list
         && signedInEmail() in request.resource.data.allowedEmails
-        && request.resource.data.ownerEmail == signedInEmail();
+        && (
+          request.resource.data.ownerEmail == signedInEmail()
+          || isLegacyDefaultFamilyMember(familyId)
+        );
     }
 
     function keepsRequesterAsMember() {
@@ -101,7 +108,7 @@ service cloud.firestore {
     }
 
     match /families/{familyId} {
-      allow create: if isCreatingOwnFamily();
+      allow create: if isCreatingOwnFamily(familyId);
       allow read: if isExistingFamilyMember(familyId);
       allow update: if isExistingFamilyMember(familyId) && keepsRequesterAsMember();
       allow delete: if false;

@@ -78,7 +78,19 @@ const bridgeMessageTypes = [
   { id: "agreement", label: "Agreement", icon: "badge-check" },
 ];
 
-const googleEmailMemberIds = {};
+const defaultFamilyEmails = {
+  me: "navalvaidya@gmail.com",
+  wife: "priyanka.naval.vaidya@gmail.com",
+  son: "vivaanvaidya@gmail.com",
+  daughter: "yuvikavaidya@gmail.com",
+};
+
+const googleEmailMemberIds = {
+  [defaultFamilyEmails.me]: "me",
+  [defaultFamilyEmails.wife]: "wife",
+  [defaultFamilyEmails.son]: "son",
+  [defaultFamilyEmails.daughter]: "daughter",
+};
 
 const mainViews = [
   { id: "home", label: "Home", icon: "layout-dashboard" },
@@ -94,36 +106,36 @@ const defaultCreditCards = [];
 const familyMembers = [
   {
     id: "me",
-    name: "Parent 1",
+    name: "Naval",
     age: "",
-    email: "",
-    phone: "",
+    email: defaultFamilyEmails.me,
+    phone: "925-416-9453",
     color: "#0f766e",
     settings: { reminderDays: 7, includeInDigest: true },
   },
   {
     id: "wife",
-    name: "Parent 2",
+    name: "Priyanka",
     age: "",
-    email: "",
-    phone: "",
+    email: defaultFamilyEmails.wife,
+    phone: "925-319-7641",
     color: "#4754a3",
     settings: { reminderDays: 7, includeInDigest: true },
   },
   {
     id: "son",
-    name: "Teen",
+    name: "Vivan",
     age: "",
-    email: "",
-    phone: "",
+    email: defaultFamilyEmails.son,
+    phone: "925-319-8191",
     color: "#d95f43",
     settings: { reminderDays: 5, includeInDigest: true },
   },
   {
     id: "daughter",
-    name: "Child",
+    name: "Yuvika",
     age: "",
-    email: "",
+    email: defaultFamilyEmails.daughter,
     phone: "",
     color: "#237a57",
     settings: { reminderDays: 3, includeInDigest: true },
@@ -131,10 +143,10 @@ const familyMembers = [
 ];
 
 const legacyNames = {
-  me: "Me",
-  wife: "Wife",
-  son: "Son",
-  daughter: "Daughter",
+  me: ["Me", "Parent 1"],
+  wife: ["Wife", "Parent 2"],
+  son: ["Son", "Teen"],
+  daughter: ["Daughter", "Child"],
 };
 
 const today = new Date();
@@ -412,17 +424,18 @@ function normalizeMembers(savedMembers = []) {
     const savedProfile = { ...saved };
     delete savedProfile["p" + "in"];
     const savedName = saved.name ?? defaultMember.name;
-    const shouldUseDefaultName = savedName === legacyNames[defaultMember.id];
+    const shouldUseDefaultName = !savedName || (legacyNames[defaultMember.id] || []).includes(savedName);
     const savedEmail = saved.email ?? defaultMember.email;
-    const shouldUseDefaultEmail = /@example\.com$/i.test(savedEmail);
+    const shouldUseDefaultEmail = !savedEmail || /@example\.com$/i.test(savedEmail);
     const savedPhone = saved.phone ?? defaultMember.phone;
+    const shouldUseDefaultPhone = !savedPhone && defaultMember.phone;
 
     return {
       ...defaultMember,
       ...savedProfile,
       name: shouldUseDefaultName ? defaultMember.name : savedName,
       email: shouldUseDefaultEmail ? defaultMember.email : savedEmail,
-      phone: normalizePhone(savedPhone),
+      phone: normalizePhone(shouldUseDefaultPhone ? defaultMember.phone : savedPhone),
       settings: {
         ...defaultMember.settings,
         ...(saved.settings ?? {}),
@@ -437,7 +450,7 @@ function normalizeFamilyProfile(family = {}, members = familyMembers) {
   const allowedEmails = [...new Set([ownerEmail, ...(Array.isArray(family.allowedEmails) ? family.allowedEmails : memberEmails)].map(normalizeEmail).filter(Boolean))];
   return {
     id: String(family.id || getActiveFamilyId()).trim(),
-    name: String(family.name || "My Family").trim(),
+    name: String(family.name || "Vaidya Family").trim(),
     ownerEmail,
     allowedEmails,
     homeAddress: String(family.homeAddress || "").trim(),
@@ -1077,6 +1090,7 @@ function subscribeToFamilyDoc() {
   cloudState.familyRef = cloudState.db.collection("families").doc(familyId);
   cloudState.unsubscribe = cloudState.familyRef.onSnapshot(
     (snapshot) => {
+      cloudState.error = "";
       if (!snapshot.exists) {
         saveCloudState(true);
         return;
@@ -1108,6 +1122,7 @@ function subscribeToBridges() {
     .where("memberEmails", "array-contains", email)
     .onSnapshot(
       (snapshot) => {
+        cloudState.error = "";
         const existingMessages = new Map(state.bridges.map((bridge) => [bridge.id, bridge.messages || []]));
         state.bridges = normalizeBridges(
           snapshot.docs.map((doc) => ({
@@ -1434,6 +1449,8 @@ function renderCloudDialog() {
   if (!elements.cloudSummary) return;
 
   const familyId = getActiveFamilyId();
+  const syncError = cloudState.error ? friendlyCloudError(cloudState.error) : "";
+  elements.cloudError.textContent = syncError;
   if (!cloudState.configured) {
     elements.cloudSummary.innerHTML = `
       <strong>Local mode</strong>
@@ -1447,8 +1464,8 @@ function renderCloudDialog() {
 
   if (cloudState.user) {
     elements.cloudSummary.innerHTML = `
-      <strong>Synced as ${escapeHTML(cloudState.user.email || "Firebase user")}</strong>
-      <span>Family data: ${escapeHTML(familyId)}</span>
+      <strong>${cloudState.error ? "Signed in, sync needs attention" : "Synced"}</strong>
+      <span>${escapeHTML(cloudState.user.email || "Firebase user")} · Family data: ${escapeHTML(familyId)}</span>
     `;
     elements.cloudGoogleBtn.hidden = true;
     elements.cloudGoogleBtn.disabled = true;
@@ -1463,6 +1480,15 @@ function renderCloudDialog() {
   elements.cloudGoogleBtn.hidden = false;
   elements.cloudGoogleBtn.disabled = false;
   elements.cloudSignOutBtn.disabled = true;
+}
+
+function friendlyCloudError(message) {
+  const text = String(message || "").trim();
+  if (!text) return "";
+  if (/permission|insufficient/i.test(text)) {
+    return "Firebase rules are blocking this account. Confirm the Firestore rules are published and this Google account is in the family allowed email list.";
+  }
+  return text;
 }
 
 function closeCloudDialog() {
@@ -6021,7 +6047,7 @@ function syncStatusSummary() {
 
 function syncStatusDetail() {
   if (!cloudState.configured) return "Local mode. Add Firebase config to use Cloud sync.";
-  if (cloudState.error) return `Cloud sync needs attention: ${cloudState.error}`;
+  if (cloudState.error) return `Cloud sync needs attention: ${friendlyCloudError(cloudState.error)}`;
   if (cloudState.user) return `Cloud sync on as ${cloudState.user.email || "Google user"}`;
   return "Cloud sync is ready. Sign in with Google to share family data.";
 }
