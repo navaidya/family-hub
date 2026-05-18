@@ -73,9 +73,46 @@ const bridgeStatuses = [
 
 const bridgeMessageTypes = [
   { id: "message", label: "Message", icon: "message-circle" },
+  { id: "feeling", label: "Feeling", icon: "heart" },
+  { id: "need", label: "Need", icon: "hand-heart" },
+  { id: "heard", label: "What I heard", icon: "ear" },
   { id: "reflection", label: "Reflection", icon: "heart-handshake" },
   { id: "suggestion", label: "Suggestion", icon: "lightbulb" },
   { id: "agreement", label: "Agreement", icon: "badge-check" },
+  { id: "next-step", label: "Next step", icon: "list-checks" },
+];
+
+const bridgePromptTemplates = [
+  {
+    type: "feeling",
+    label: "Feeling",
+    text: "I am feeling...\n\nWhat made me feel this way is...",
+  },
+  {
+    type: "need",
+    label: "Need",
+    text: "What I need is...\n\nThis would help because...",
+  },
+  {
+    type: "heard",
+    label: "What I heard",
+    text: "What I heard you say is...\n\nI may be misunderstanding this part...",
+  },
+  {
+    type: "suggestion",
+    label: "Suggestion",
+    text: "One thing we could try is...\n\nI can help by...",
+  },
+  {
+    type: "agreement",
+    label: "Agreement",
+    text: "What we agree to try is...\n\nWe will check back on...",
+  },
+  {
+    type: "next-step",
+    label: "Next step",
+    text: "Next step:\nOwner:\nBy when:",
+  },
 ];
 
 const defaultFamilyEmails = {
@@ -2135,15 +2172,38 @@ function renderBridgeDetail() {
   if (!bridge) return;
 
   const isCreator = bridge.creator === state.currentMemberId;
+  const summary = buildBridgeSummary(bridge);
+  const timeline = buildBridgeTimeline(bridge);
+  const memberChips = bridge.members
+    .map((memberId) => {
+      const member = getMember(memberId);
+      return `
+        <span class="bridge-member-chip">
+          <span class="avatar mini" style="background:${member?.color || "#64748b"}">${initials(memberName(memberId))}</span>
+          ${escapeHTML(memberName(memberId))}
+        </span>
+      `;
+    })
+    .join("");
   const messages = bridge.messages.length
     ? bridge.messages
         .map(
           (message) => `
             <article class="bridge-message ${escapeAttribute(message.type)}">
-              <div class="comment-meta">
-                ${message.type === "system" ? "Bridge" : escapeHTML(memberName(message.author))}
-                · ${escapeHTML(bridgeMessageTypeLabel(message.type))}
-                · ${formatDateTime(message.createdAt)}
+              <div class="bridge-message-head">
+                <div class="comment-meta">
+                  ${message.type === "system" ? "Bridge" : escapeHTML(memberName(message.author))}
+                  · ${escapeHTML(bridgeMessageTypeLabel(message.type))}
+                  · ${formatDateTime(message.createdAt)}
+                </div>
+                ${
+                  message.type === "system"
+                    ? ""
+                    : `<button class="secondary-button bridge-message-action" type="button" data-bridge-message-task="${escapeAttribute(message.id)}">
+                        <i data-lucide="list-plus"></i>
+                        Task
+                      </button>`
+                }
               </div>
               <p>${escapeHTML(message.text)}</p>
             </article>
@@ -2172,6 +2232,76 @@ function renderBridgeDetail() {
         <div class="fact"><span>Privacy</span><strong>Members only</strong></div>
       </section>
 
+      <section class="bridge-privacy-panel">
+        <div>
+          <h3>Visible to</h3>
+          <p>Only these members can see this Bridge. The creator controls membership.</p>
+        </div>
+        <div class="bridge-member-chip-list">${memberChips}</div>
+      </section>
+
+      <section class="bridge-guidance">
+        <div>
+          <h3>Guided prompts</h3>
+          <p>Use these to slow the conversation down and make the next message easier to write.</p>
+        </div>
+        <div class="bridge-prompt-grid">
+          ${bridgePromptTemplates
+            .map(
+              (prompt) => `
+                <button class="chip-button" type="button" data-bridge-prompt="${escapeAttribute(prompt.type)}">
+                  ${escapeHTML(prompt.label)}
+                </button>
+              `,
+            )
+            .join("")}
+        </div>
+      </section>
+
+      <section class="bridge-summary-panel">
+        <div class="section-heading-row">
+          <div>
+            <h3>Bridge summary</h3>
+            <p>Built from the conversation so everyone can see where things stand.</p>
+          </div>
+        </div>
+        <div class="bridge-summary-grid">
+          ${summary
+            .map(
+              (item) => `
+                <article class="bridge-summary-card">
+                  <span>${escapeHTML(item.label)}</span>
+                  <strong>${escapeHTML(item.value)}</strong>
+                </article>
+              `,
+            )
+            .join("")}
+        </div>
+      </section>
+
+      <section class="bridge-timeline-panel">
+        <h3>Timeline</h3>
+        ${
+          timeline.length
+            ? `<div class="bridge-timeline">
+                ${timeline
+                  .map(
+                    (item) => `
+                      <div class="bridge-timeline-item">
+                        <i data-lucide="${escapeAttribute(item.icon)}"></i>
+                        <div>
+                          <strong>${escapeHTML(item.title)}</strong>
+                          <span>${escapeHTML(item.detail)}</span>
+                        </div>
+                      </div>
+                    `,
+                  )
+                  .join("")}
+              </div>`
+            : `<div class="empty-state compact">Timeline will build as messages are added.</div>`
+        }
+      </section>
+
       <section class="conversation bridge-thread">
         <h3>Conversation</h3>
         ${messages}
@@ -2192,8 +2322,62 @@ function renderBridgeDetail() {
   `;
 
   elements.bridgeDetail.querySelector("[data-bridge-edit]")?.addEventListener("click", () => openBridgeDialog(bridge));
-  elements.bridgeDetail.querySelector("[data-bridge-message-form]")?.addEventListener("submit", addBridgeMessage);
+  const messageForm = elements.bridgeDetail.querySelector("[data-bridge-message-form]");
+  messageForm?.addEventListener("submit", addBridgeMessage);
+  elements.bridgeDetail.querySelectorAll("[data-bridge-prompt]").forEach((button) => {
+    button.addEventListener("click", () => applyBridgePrompt(button.dataset.bridgePrompt, messageForm));
+  });
+  elements.bridgeDetail.querySelectorAll("[data-bridge-message-task]").forEach((button) => {
+    button.addEventListener("click", () => makeTaskFromBridgeMessage(bridge.id, button.dataset.bridgeMessageTask));
+  });
   refreshIcons();
+}
+
+function buildBridgeSummary(bridge) {
+  const messages = bridge.messages.filter((message) => message.type !== "system");
+  const participantViews = bridge.members
+    .map((memberId) => {
+      const latest = [...messages].reverse().find((message) => message.author === memberId);
+      return `${memberName(memberId)}: ${latest ? bridgeSnippet(latest.text) : "No point of view yet"}`;
+    })
+    .join(" | ");
+  const agreements = messages.filter((message) => message.type === "agreement").slice(-2).map((message) => bridgeSnippet(message.text));
+  const questions = messages.filter((message) => /\?/.test(message.text)).slice(-2).map((message) => bridgeSnippet(message.text));
+  const nextSteps = messages.filter((message) => message.type === "next-step").slice(-2).map((message) => bridgeSnippet(message.text));
+  const suggestions = messages.filter((message) => message.type === "suggestion").slice(-2).map((message) => bridgeSnippet(message.text));
+
+  return [
+    { label: "Point of view", value: participantViews || "No member views yet" },
+    { label: "Agreements", value: agreements.join(" | ") || "No agreements yet" },
+    { label: "Open questions", value: questions.join(" | ") || "No open questions captured yet" },
+    { label: "Next steps", value: nextSteps.join(" | ") || suggestions.join(" | ") || "No next steps yet" },
+  ];
+}
+
+function buildBridgeTimeline(bridge) {
+  return bridge.messages.slice(-8).map((message) => ({
+    icon: bridgeMessageTypeIcon(message.type),
+    title: `${message.type === "system" ? "Bridge" : memberName(message.author)} · ${bridgeMessageTypeLabel(message.type)}`,
+    detail: `${formatDateTime(message.createdAt)} · ${bridgeSnippet(message.text, 110)}`,
+  }));
+}
+
+function bridgeSnippet(text, maxLength = 130) {
+  const cleaned = String(text || "").replace(/\s+/g, " ").trim();
+  if (!cleaned) return "No details";
+  return cleaned.length > maxLength ? `${cleaned.slice(0, maxLength - 3).trim()}...` : cleaned;
+}
+
+function applyBridgePrompt(type, formElement) {
+  if (!formElement) return;
+  const prompt = bridgePromptTemplates.find((item) => item.type === type);
+  if (!prompt) return;
+
+  const typeField = formElement.elements.type;
+  const textField = formElement.elements.text;
+  typeField.value = prompt.type;
+  textField.value = textField.value.trim() ? `${textField.value.trim()}\n\n${prompt.text}` : prompt.text;
+  textField.focus();
 }
 
 function openBridgeDialog(bridge = null) {
@@ -2374,15 +2558,22 @@ async function addBridgeMessageRecord(bridge, message) {
   if (cloudState.enabled && cloudState.user && cloudState.bridgesRef) {
     await cloudState.bridgesRef.doc(bridge.id).collection("messages").doc(normalized.id).set(normalized);
     await cloudState.bridgesRef.doc(bridge.id).set({ updatedAt: normalized.createdAt }, { merge: true });
+    upsertBridgeMessageLocally(bridge.id, normalized);
+    renderBridge();
     return;
   }
 
-  const target = state.bridges.find((item) => item.id === bridge.id);
-  if (!target) return;
-  target.messages = normalizeBridgeMessages([...(target.messages || []), normalized]);
-  target.updatedAt = normalized.createdAt;
+  upsertBridgeMessageLocally(bridge.id, normalized);
   saveState();
   renderBridge();
+}
+
+function upsertBridgeMessageLocally(bridgeId, message) {
+  const target = state.bridges.find((item) => item.id === bridgeId);
+  if (!target) return;
+  target.messages = normalizeBridgeMessages([...(target.messages || []).filter((item) => item.id !== message.id), message]);
+  target.updatedAt = message.createdAt;
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
 }
 
 async function archiveCurrentBridge() {
@@ -2397,6 +2588,60 @@ async function archiveCurrentBridge() {
   await addBridgeSystemMessage(bridge, `${memberName(state.currentMemberId)} archived this Bridge.`);
   closeBridgeDialog();
   renderBridge();
+}
+
+async function makeTaskFromBridgeMessage(bridgeId, messageId) {
+  const bridge = state.bridges.find((item) => item.id === bridgeId);
+  const message = bridge?.messages.find((item) => item.id === messageId);
+  if (!bridge || !message) return;
+
+  const now = new Date().toISOString();
+  const task = {
+    id: crypto.randomUUID(),
+    title: deriveBridgeTaskTitle(message.text, bridge.title),
+    type: message.type === "agreement" || message.type === "next-step" ? "todo" : "ask",
+    status: "assigned",
+    requester: message.author || state.currentMemberId,
+    assignee: state.currentMemberId,
+    dueDate: addDays(isoToday, 7),
+    recurrence: "none",
+    priority: message.type === "need" ? "high" : "normal",
+    description: `Created from Bridge: ${bridge.title}\n\nMessage type: ${bridgeMessageTypeLabel(message.type)}\nAuthor: ${memberName(message.author)}\n\n${message.text}`,
+    comments: [
+      {
+        id: crypto.randomUUID(),
+        author: state.currentMemberId,
+        createdAt: now,
+        text: "Created from a Bridge message.",
+      },
+    ],
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  state.tasks.unshift(task);
+  selectedTaskId = task.id;
+  activeMainView = "tasks";
+  saveState();
+  try {
+    await addBridgeSystemMessage(bridge, `${memberName(state.currentMemberId)} created task "${task.title}" from a Bridge message.`);
+  } catch (error) {
+    console.warn("Task was created, but the Bridge system message could not be saved.", error);
+  }
+  render();
+  document.querySelector(".task-calendar-layout")?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function deriveBridgeTaskTitle(text, bridgeTitle) {
+  const firstLine = String(text || "")
+    .split("\n")
+    .map((line) => line.trim())
+    .find(Boolean);
+  const cleaned = (firstLine || bridgeTitle || "Bridge follow up")
+    .replace(/^(next step|owner|by when|what we agree to try is|one thing we could try is)\s*:?\s*/i, "")
+    .trim();
+  const title = cleaned || `Follow up: ${bridgeTitle}`;
+  return title.length > 72 ? `${title.slice(0, 69).trim()}...` : title;
 }
 
 function renderTrips() {
