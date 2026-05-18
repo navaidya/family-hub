@@ -62,12 +62,29 @@ const wishLinkTypes = [
   { id: "other", label: "Other" },
 ];
 
+const bridgeStatuses = [
+  { id: "open", label: "Open" },
+  { id: "paused", label: "Paused" },
+  { id: "working", label: "Working on it" },
+  { id: "agreement", label: "Agreement reached" },
+  { id: "closed", label: "Closed" },
+  { id: "archived", label: "Archived" },
+];
+
+const bridgeMessageTypes = [
+  { id: "message", label: "Message", icon: "message-circle" },
+  { id: "reflection", label: "Reflection", icon: "heart-handshake" },
+  { id: "suggestion", label: "Suggestion", icon: "lightbulb" },
+  { id: "agreement", label: "Agreement", icon: "badge-check" },
+];
+
 const googleEmailMemberIds = {};
 
 const mainViews = [
   { id: "home", label: "Home", icon: "layout-dashboard" },
   { id: "tasks", label: "Tasks", icon: "list-checks" },
   { id: "wishlist", label: "Dreams", icon: "sparkles" },
+  { id: "bridge", label: "Bridge", icon: "messages-square" },
   { id: "vacation", label: "Vacation", icon: "map" },
   { id: "finance", label: "Finance", icon: "wallet-cards" },
 ];
@@ -131,6 +148,7 @@ let activeWishMemberId = "all";
 let selectedTaskId = null;
 let selectedTripId = state.trips?.[0]?.id ?? null;
 let selectedWishId = state.wishes?.[0]?.id ?? null;
+let selectedBridgeId = state.bridges?.[0]?.id ?? null;
 let visibleMonth = new Date(today.getFullYear(), today.getMonth(), 1);
 let visibleVacationMonth = monthForDate(state.trips?.[0]?.startDate) || new Date(today.getFullYear(), today.getMonth(), 1);
 let visibleFinanceMonth = new Date(today.getFullYear(), today.getMonth(), 1);
@@ -155,12 +173,16 @@ const elements = {
   taskView: document.querySelector("#taskView"),
   taskSupportView: document.querySelector("#taskSupportView"),
   wishlistView: document.querySelector("#wishlistView"),
+  bridgeView: document.querySelector("#bridgeView"),
   vacationView: document.querySelector("#vacationView"),
   financeView: document.querySelector("#financeView"),
   newWishBtn: document.querySelector("#newWishBtn"),
   wishTabs: document.querySelector("#wishTabs"),
   wishList: document.querySelector("#wishList"),
   wishDetail: document.querySelector("#wishDetail"),
+  newBridgeBtn: document.querySelector("#newBridgeBtn"),
+  bridgeList: document.querySelector("#bridgeList"),
+  bridgeDetail: document.querySelector("#bridgeDetail"),
   newTripBtn: document.querySelector("#newTripBtn"),
   tripList: document.querySelector("#tripList"),
   tripDetail: document.querySelector("#tripDetail"),
@@ -217,6 +239,12 @@ const elements = {
   wishDialogTitle: document.querySelector("#wishDialogTitle"),
   closeWishDialogBtn: document.querySelector("#closeWishDialogBtn"),
   deleteWishBtn: document.querySelector("#deleteWishBtn"),
+  bridgeDialog: document.querySelector("#bridgeDialog"),
+  bridgeForm: document.querySelector("#bridgeForm"),
+  bridgeDialogTitle: document.querySelector("#bridgeDialogTitle"),
+  closeBridgeDialogBtn: document.querySelector("#closeBridgeDialogBtn"),
+  archiveBridgeBtn: document.querySelector("#archiveBridgeBtn"),
+  bridgeMemberGrid: document.querySelector("#bridgeMemberGrid"),
   exportBtn: document.querySelector("#exportBtn"),
   importInput: document.querySelector("#importInput"),
   emailDigestBtn: document.querySelector("#emailDigestBtn"),
@@ -327,6 +355,14 @@ const wishForm = {
   details: document.querySelector("#wishDetails"),
 };
 
+const bridgeForm = {
+  id: document.querySelector("#bridgeId"),
+  title: document.querySelector("#bridgeTitle"),
+  status: document.querySelector("#bridgeStatus"),
+  creator: document.querySelector("#bridgeCreator"),
+  purpose: document.querySelector("#bridgePurpose"),
+};
+
 render();
 bindEvents();
 registerServiceWorker();
@@ -346,6 +382,7 @@ function loadState() {
         notes: normalizeNotes(parsed.notes),
         trips: normalizeTrips(parsed.trips),
         wishes: normalizeWishes(parsed.wishes),
+        bridges: normalizeBridges(parsed.bridges, members),
         expenses: normalizeExpenses(parsed.expenses),
         creditCards: normalizeCreditCards(parsed.creditCards),
         currentMemberId: localStorage.getItem(LOCAL_PROFILE_KEY) || parsed.currentMemberId || "me",
@@ -362,6 +399,7 @@ function loadState() {
     notes: normalizeNotes(),
     trips: normalizeTrips(),
     wishes: normalizeWishes(),
+    bridges: normalizeBridges([], normalizeMembers()),
     expenses: normalizeExpenses(),
     creditCards: normalizeCreditCards(),
     currentMemberId: localStorage.getItem(LOCAL_PROFILE_KEY) || "me",
@@ -668,6 +706,71 @@ function normalizeWishLinks(links = []) {
     .sort((a, b) => b.addedAt.localeCompare(a.addedAt));
 }
 
+function normalizeBridges(bridges = [], members = familyMembers) {
+  if (!Array.isArray(bridges)) return [];
+  return bridges
+    .filter((bridge) => bridge && typeof bridge === "object")
+    .map((bridge) => {
+      const creator = getKnownMemberId(bridge.creator) || getKnownMemberId(bridge.creatorId) || "me";
+      const memberIds = normalizeBridgeMembers(bridge.members || bridge.memberIds, creator);
+      return {
+        id: bridge.id || crypto.randomUUID(),
+        title: String(bridge.title || "Private Bridge").trim().slice(0, 90),
+        purpose: String(bridge.purpose || "").trim().slice(0, 500),
+        status: bridgeStatuses.some((status) => status.id === bridge.status) ? bridge.status : "open",
+        creator,
+        creatorEmail: normalizeEmail(bridge.creatorEmail) || normalizeEmail(memberFromList(creator, members)?.email),
+        members: memberIds,
+        memberEmails: bridgeMemberEmails(memberIds, bridge.memberEmails, members),
+        messages: normalizeBridgeMessages(bridge.messages),
+        createdAt: bridge.createdAt || new Date().toISOString(),
+        updatedAt: bridge.updatedAt || bridge.createdAt || new Date().toISOString(),
+      };
+    })
+    .filter((bridge) => bridge.title && bridge.members.length)
+    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+}
+
+function normalizeBridgeMembers(members = [], creator = state?.currentMemberId || "me") {
+  const ids = Array.isArray(members) ? members.map(getKnownMemberId).filter(Boolean) : [];
+  return [...new Set([creator, ...ids].filter(Boolean))];
+}
+
+function bridgeMemberEmails(memberIds = [], existingEmails = [], members = familyMembers) {
+  return [
+    ...(Array.isArray(existingEmails) ? existingEmails : []),
+    ...memberIds.map((memberId) => memberFromList(memberId, members)?.email),
+  ]
+    .map(normalizeEmail)
+    .filter(Boolean)
+    .filter((email, index, list) => list.indexOf(email) === index);
+}
+
+function memberFromList(id, members = []) {
+  return members.find((member) => member.id === id) || null;
+}
+
+function normalizeBridgeMessages(messages = []) {
+  if (!Array.isArray(messages)) return [];
+  return messages
+    .filter((message) => message && typeof message === "object")
+    .map((message) => ({
+      id: message.id || crypto.randomUUID(),
+      author: getKnownMemberId(message.author) || "",
+      authorEmail: normalizeEmail(message.authorEmail),
+      type: bridgeMessageType(message.type),
+      text: String(message.text || "").trim().slice(0, 1600),
+      createdAt: message.createdAt || new Date().toISOString(),
+    }))
+    .filter((message) => message.text)
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+}
+
+function bridgeMessageType(type) {
+  if (type === "system") return "system";
+  return bridgeMessageTypes.some((item) => item.id === type) ? type : "message";
+}
+
 function normalizePhone(phone) {
   return String(phone || "").trim();
 }
@@ -746,6 +849,10 @@ function bindEvents() {
   elements.wishForm.addEventListener("submit", saveWishFromForm);
   elements.deleteWishBtn.addEventListener("click", deleteCurrentWish);
   wishForm.timeframe.addEventListener("change", syncWishTimeframeField);
+  elements.newBridgeBtn.addEventListener("click", () => openBridgeDialog());
+  elements.closeBridgeDialogBtn.addEventListener("click", closeBridgeDialog);
+  elements.bridgeForm.addEventListener("submit", saveBridgeFromForm);
+  elements.archiveBridgeBtn.addEventListener("click", archiveCurrentBridge);
   elements.searchInput.addEventListener("input", renderTasks);
   elements.exportBtn?.addEventListener("click", exportState);
   elements.importInput?.addEventListener("change", importState);
@@ -772,6 +879,10 @@ function bindEvents() {
 
   elements.wishDialog.addEventListener("click", (event) => {
     if (event.target === elements.wishDialog) closeWishDialog();
+  });
+
+  elements.bridgeDialog.addEventListener("click", (event) => {
+    if (event.target === elements.bridgeDialog) closeBridgeDialog();
   });
 
   elements.loginForm.addEventListener("submit", loginAsSelectedMember);
@@ -862,6 +973,10 @@ function createCloudState() {
     familyId: "",
     familyRef: null,
     unsubscribe: null,
+    bridgesRef: null,
+    bridgeUnsubscribe: null,
+    bridgeMessagesUnsubscribe: null,
+    bridgeMessagesId: "",
     applyingRemote: false,
     saveTimer: null,
     error: "",
@@ -896,11 +1011,21 @@ function initCloudSync() {
         cloudState.unsubscribe();
         cloudState.unsubscribe = null;
       }
+      if (cloudState.bridgeUnsubscribe) {
+        cloudState.bridgeUnsubscribe();
+        cloudState.bridgeUnsubscribe = null;
+      }
+      if (cloudState.bridgeMessagesUnsubscribe) {
+        cloudState.bridgeMessagesUnsubscribe();
+        cloudState.bridgeMessagesUnsubscribe = null;
+        cloudState.bridgeMessagesId = "";
+      }
 
       if (user) {
         applySignedInProfile(user);
         render();
         subscribeToFamilyDoc();
+        subscribeToBridges();
       }
 
       renderAuthGate(user ? "ready" : "required");
@@ -968,6 +1093,71 @@ function subscribeToFamilyDoc() {
   );
 }
 
+function subscribeToBridges() {
+  if (!cloudState.enabled || !cloudState.user || !cloudState.familyRef) return;
+  if (cloudState.bridgeUnsubscribe) {
+    cloudState.bridgeUnsubscribe();
+    cloudState.bridgeUnsubscribe = null;
+  }
+
+  const email = normalizeEmail(cloudState.user.email);
+  if (!email) return;
+
+  cloudState.bridgesRef = cloudState.familyRef.collection("bridges");
+  cloudState.bridgeUnsubscribe = cloudState.bridgesRef
+    .where("memberEmails", "array-contains", email)
+    .onSnapshot(
+      (snapshot) => {
+        const existingMessages = new Map(state.bridges.map((bridge) => [bridge.id, bridge.messages || []]));
+        state.bridges = normalizeBridges(
+          snapshot.docs.map((doc) => ({
+            id: doc.id,
+            ...doc.data(),
+            messages: existingMessages.get(doc.id) || [],
+          })),
+          state.members,
+        );
+        if (!state.bridges.some((bridge) => bridge.id === selectedBridgeId)) {
+          selectedBridgeId = state.bridges[0]?.id ?? null;
+        }
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        renderBridge();
+        subscribeToSelectedBridgeMessages();
+      },
+      (error) => {
+        cloudState.error = error.message || "Could not read private Bridge channels.";
+        renderCloudStatus();
+        renderBridge();
+      },
+    );
+}
+
+function subscribeToSelectedBridgeMessages() {
+  if (!cloudState.enabled || !cloudState.user || !cloudState.bridgesRef || !selectedBridgeId) return;
+  if (cloudState.bridgeMessagesId === selectedBridgeId && cloudState.bridgeMessagesUnsubscribe) return;
+  if (cloudState.bridgeMessagesUnsubscribe) {
+    cloudState.bridgeMessagesUnsubscribe();
+    cloudState.bridgeMessagesUnsubscribe = null;
+  }
+
+  cloudState.bridgeMessagesId = selectedBridgeId;
+  cloudState.bridgeMessagesUnsubscribe = cloudState.bridgesRef
+    .doc(selectedBridgeId)
+    .collection("messages")
+    .orderBy("createdAt", "asc")
+    .onSnapshot(
+      (snapshot) => {
+        const bridge = state.bridges.find((item) => item.id === selectedBridgeId);
+        if (!bridge) return;
+        bridge.messages = normalizeBridgeMessages(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
+        renderBridgeDetail();
+      },
+      (error) => {
+        console.warn("Could not read Bridge messages", error);
+      },
+    );
+}
+
 function applyRemoteFamilyData(data = {}) {
   cloudState.applyingRemote = true;
   const members = normalizeMembers(data.members);
@@ -979,6 +1169,7 @@ function applyRemoteFamilyData(data = {}) {
     notes: normalizeNotes(data.notes),
     trips: normalizeTrips(data.trips),
     wishes: normalizeWishes(data.wishes),
+    bridges: normalizeBridges(state.bridges, members),
     expenses: normalizeExpenses(data.expenses),
     creditCards: normalizeCreditCards(data.creditCards),
     currentMemberId: signedInMemberId || localStorage.getItem(LOCAL_PROFILE_KEY) || state.currentMemberId || "me",
@@ -1003,6 +1194,10 @@ function applyRemoteFamilyData(data = {}) {
 
   if (!state.wishes.some((wish) => wish.id === selectedWishId)) {
     selectedWishId = state.wishes[0]?.id ?? null;
+  }
+
+  if (!state.bridges.some((bridge) => bridge.id === selectedBridgeId)) {
+    selectedBridgeId = state.bridges[0]?.id ?? null;
   }
 
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
@@ -1375,7 +1570,17 @@ function resubscribeToActiveFamily() {
     cloudState.unsubscribe();
     cloudState.unsubscribe = null;
   }
+  if (cloudState.bridgeUnsubscribe) {
+    cloudState.bridgeUnsubscribe();
+    cloudState.bridgeUnsubscribe = null;
+  }
+  if (cloudState.bridgeMessagesUnsubscribe) {
+    cloudState.bridgeMessagesUnsubscribe();
+    cloudState.bridgeMessagesUnsubscribe = null;
+    cloudState.bridgeMessagesId = "";
+  }
   subscribeToFamilyDoc();
+  subscribeToBridges();
 }
 
 function signInWithGoogle() {
@@ -1429,6 +1634,7 @@ function render() {
   renderMainTabs();
   renderHomeDashboard();
   renderWishes();
+  renderBridge();
   renderTrips();
   renderFinance();
   renderStatusTabs();
@@ -1448,6 +1654,7 @@ function saveState() {
   state.notes = normalizeNotes(state.notes);
   state.trips = normalizeTrips(state.trips);
   state.wishes = normalizeWishes(state.wishes);
+  state.bridges = normalizeBridges(state.bridges, state.members);
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   localStorage.setItem(LOCAL_PROFILE_KEY, state.currentMemberId);
   localStorage.removeItem(LEGACY_STORAGE_KEY);
@@ -1497,6 +1704,7 @@ function renderMainTabs() {
           tasks: state.tasks.filter((task) => task.status !== "done").length,
           home: getHomeAttentionCount(),
           wishlist: state.wishes.filter((wish) => !isClosedWish(wish)).length,
+          bridge: state.bridges.filter((bridge) => !isClosedBridge(bridge)).length,
           vacation: state.trips.length,
           finance: getExpensesForFinanceMonth().length,
         }[view.id] ?? 0;
@@ -1514,6 +1722,7 @@ function renderMainTabs() {
   elements.taskView.hidden = activeMainView !== "tasks";
   elements.taskSupportView.hidden = activeMainView !== "tasks";
   elements.wishlistView.hidden = activeMainView !== "wishlist";
+  elements.bridgeView.hidden = activeMainView !== "bridge";
   elements.vacationView.hidden = activeMainView !== "vacation";
   elements.financeView.hidden = activeMainView !== "finance";
 
@@ -1834,6 +2043,285 @@ function renderWishDetail() {
   elements.wishDetail.querySelector("[data-wish-comment-form]").addEventListener("submit", addWishComment);
   elements.wishDetail.querySelector("[data-wish-done]")?.addEventListener("click", () => markWishDone(wish.id));
   refreshIcons();
+}
+
+function renderBridge() {
+  if (!elements.bridgeList || !elements.bridgeDetail) return;
+  const bridges = getVisibleBridges();
+
+  if (!bridges.length) {
+    selectedBridgeId = null;
+    elements.bridgeList.innerHTML = `<div class="empty-state compact">No Bridge channels yet.</div>`;
+    elements.bridgeDetail.innerHTML = `
+      <div class="empty-detail compact-detail">
+        <i data-lucide="messages-square"></i>
+        <h2>Start a private Bridge</h2>
+        <p>Create a private channel for reflection, suggestions, agreements, or a hard conversation that needs time.</p>
+      </div>
+    `;
+    refreshIcons();
+    return;
+  }
+
+  if (!bridges.some((bridge) => bridge.id === selectedBridgeId)) {
+    selectedBridgeId = bridges[0].id;
+  }
+
+  elements.bridgeList.innerHTML = bridges
+    .map((bridge) => {
+      const selected = bridge.id === selectedBridgeId;
+      const members = bridge.members.map(memberName).join(", ");
+      return `
+        <button class="bridge-row ${selected ? "selected" : ""} ${isClosedBridge(bridge) ? "done" : ""}" type="button" data-bridge-id="${escapeAttribute(bridge.id)}">
+          <span class="bridge-status-dot ${escapeAttribute(bridge.status)}"></span>
+          <span>
+            <strong>${escapeHTML(bridge.title)}</strong>
+            <span>${escapeHTML(bridgeStatusLabel(bridge.status))} · ${escapeHTML(members)}</span>
+            <span>${bridge.messages.length} message${bridge.messages.length === 1 ? "" : "s"} · ${formatDateTime(bridge.updatedAt)}</span>
+          </span>
+        </button>
+      `;
+    })
+    .join("");
+
+  elements.bridgeList.querySelectorAll("[data-bridge-id]").forEach((button) => {
+    button.addEventListener("click", () => {
+      selectedBridgeId = button.dataset.bridgeId;
+      subscribeToSelectedBridgeMessages();
+      renderBridge();
+      refreshIcons();
+    });
+  });
+
+  subscribeToSelectedBridgeMessages();
+  renderBridgeDetail();
+}
+
+function renderBridgeDetail() {
+  const bridge = getSelectedBridge();
+  if (!bridge) return;
+
+  const isCreator = bridge.creator === state.currentMemberId;
+  const messages = bridge.messages.length
+    ? bridge.messages
+        .map(
+          (message) => `
+            <article class="bridge-message ${escapeAttribute(message.type)}">
+              <div class="comment-meta">
+                ${message.type === "system" ? "Bridge" : escapeHTML(memberName(message.author))}
+                · ${escapeHTML(bridgeMessageTypeLabel(message.type))}
+                · ${formatDateTime(message.createdAt)}
+              </div>
+              <p>${escapeHTML(message.text)}</p>
+            </article>
+          `,
+        )
+        .join("")
+    : `<div class="empty-state compact">No messages yet.</div>`;
+
+  elements.bridgeDetail.innerHTML = `
+    <div class="bridge-detail-stack">
+      <div class="detail-top">
+        <div>
+          <p class="eyebrow">Private Bridge</p>
+          <h2 class="detail-title">${escapeHTML(bridge.title)}</h2>
+          <p class="task-description">${escapeHTML(bridge.purpose || "No purpose added yet.")}</p>
+        </div>
+        <div class="detail-actions">
+          ${isCreator ? `<button class="secondary-button" type="button" data-bridge-edit><i data-lucide="settings-2"></i>Manage</button>` : ""}
+        </div>
+      </div>
+
+      <section class="detail-facts">
+        <div class="fact"><span>Creator</span><strong>${escapeHTML(memberName(bridge.creator))}</strong></div>
+        <div class="fact"><span>Status</span><strong>${escapeHTML(bridgeStatusLabel(bridge.status))}</strong></div>
+        <div class="fact"><span>Members</span><strong>${escapeHTML(bridge.members.map(memberName).join(", "))}</strong></div>
+        <div class="fact"><span>Privacy</span><strong>Members only</strong></div>
+      </section>
+
+      <section class="conversation bridge-thread">
+        <h3>Conversation</h3>
+        ${messages}
+      </section>
+
+      ${
+        isClosedBridge(bridge)
+          ? `<div class="empty-state compact">This Bridge is closed or archived.</div>`
+          : `<form class="bridge-message-form" data-bridge-message-form>
+              <select name="type" aria-label="Message type">
+                ${bridgeMessageTypes.map((type) => `<option value="${type.id}">${type.label}</option>`).join("")}
+              </select>
+              <textarea name="text" rows="3" maxlength="1600" required placeholder="Write a message, reflection, suggestion, or agreement"></textarea>
+              <button class="primary-button" type="submit"><i data-lucide="send"></i>Send</button>
+            </form>`
+      }
+    </div>
+  `;
+
+  elements.bridgeDetail.querySelector("[data-bridge-edit]")?.addEventListener("click", () => openBridgeDialog(bridge));
+  elements.bridgeDetail.querySelector("[data-bridge-message-form]")?.addEventListener("submit", addBridgeMessage);
+  refreshIcons();
+}
+
+function openBridgeDialog(bridge = null) {
+  const creator = bridge?.creator || state.currentMemberId;
+  const isCreator = !bridge || creator === state.currentMemberId;
+  elements.bridgeDialogTitle.textContent = bridge ? "Manage Bridge" : "Start Bridge";
+  elements.archiveBridgeBtn.style.visibility = bridge && isCreator ? "visible" : "hidden";
+
+  bridgeForm.id.value = bridge?.id ?? "";
+  bridgeForm.title.value = bridge?.title ?? "";
+  bridgeForm.status.value = bridge?.status ?? "open";
+  bridgeForm.creator.value = memberName(creator);
+  bridgeForm.purpose.value = bridge?.purpose ?? "";
+
+  renderBridgeMemberPicker(bridge, creator, isCreator);
+  elements.bridgeForm.querySelector('button[type="submit"]').disabled = !isCreator;
+  elements.bridgeDialog.showModal();
+  bridgeForm.title.focus();
+  refreshIcons();
+}
+
+function renderBridgeMemberPicker(bridge, creator, isCreator) {
+  const selectedMembers = new Set(bridge?.members?.length ? bridge.members : [creator]);
+  selectedMembers.add(creator);
+  elements.bridgeMemberGrid.innerHTML = state.members
+    .map((member) => {
+      const checked = selectedMembers.has(member.id);
+      const locked = member.id === creator || !isCreator;
+      return `
+        <label class="bridge-member-option ${checked ? "selected" : ""}">
+          <input type="checkbox" value="${escapeAttribute(member.id)}" ${checked ? "checked" : ""} ${locked ? "disabled" : ""} />
+          <span class="avatar mini" style="background:${member.color}">${initials(member.name)}</span>
+          <span>
+            <strong>${escapeHTML(member.name)}</strong>
+            <small>${member.id === creator ? "Creator" : escapeHTML(member.email || "No email")}</small>
+          </span>
+        </label>
+      `;
+    })
+    .join("");
+}
+
+function closeBridgeDialog() {
+  elements.bridgeDialog.close();
+  elements.bridgeForm.reset();
+}
+
+async function saveBridgeFromForm(event) {
+  event.preventDefault();
+  const existing = getSelectedBridge();
+  const id = bridgeForm.id.value || crypto.randomUUID();
+  const previous = state.bridges.find((bridge) => bridge.id === id);
+  const creator = previous?.creator || state.currentMemberId;
+  if (previous && creator !== state.currentMemberId) return;
+
+  const checkedMembers = [...elements.bridgeMemberGrid.querySelectorAll("input[type='checkbox']:checked")].map((input) => input.value);
+  const members = normalizeBridgeMembers(checkedMembers, creator);
+  const now = new Date().toISOString();
+  const bridge = {
+    id,
+    title: bridgeForm.title.value.trim(),
+    purpose: bridgeForm.purpose.value.trim(),
+    status: bridgeForm.status.value,
+    creator,
+    creatorEmail: normalizeEmail(getMember(creator)?.email || cloudState.user?.email),
+    members,
+    memberEmails: [
+      ...bridgeMemberEmails(members, previous?.memberEmails, state.members),
+      normalizeEmail(cloudState.user?.email),
+    ].filter(Boolean).filter((email, index, list) => list.indexOf(email) === index),
+    messages: previous?.messages || [],
+    createdAt: previous?.createdAt || now,
+    updatedAt: now,
+  };
+
+  const membershipChanged = previous && previous.members.slice().sort().join(",") !== members.slice().sort().join(",");
+  await saveBridge(bridge);
+  selectedBridgeId = id;
+
+  if (membershipChanged) {
+    await addBridgeSystemMessage(bridge, `Members updated by ${memberName(state.currentMemberId)}.`);
+  } else if (!previous) {
+    await addBridgeSystemMessage(bridge, `${memberName(state.currentMemberId)} started this Bridge.`);
+  }
+
+  closeBridgeDialog();
+  renderBridge();
+}
+
+async function saveBridge(bridge) {
+  if (cloudState.enabled && cloudState.user && cloudState.bridgesRef) {
+    const { messages, ...payload } = bridge;
+    await cloudState.bridgesRef.doc(bridge.id).set(payload, { merge: true });
+    return;
+  }
+
+  state.bridges = normalizeBridges([bridge, ...state.bridges.filter((item) => item.id !== bridge.id)], state.members);
+  saveState();
+}
+
+async function addBridgeMessage(event) {
+  event.preventDefault();
+  const bridge = getSelectedBridge();
+  if (!bridge || isClosedBridge(bridge)) return;
+
+  const data = new FormData(event.currentTarget);
+  const text = String(data.get("text") || "").trim();
+  if (!text) return;
+
+  await addBridgeMessageRecord(bridge, {
+    id: crypto.randomUUID(),
+    author: state.currentMemberId,
+    authorEmail: normalizeEmail(currentMember().email || cloudState.user?.email),
+    type: String(data.get("type") || "message"),
+    text,
+    createdAt: new Date().toISOString(),
+  });
+  event.currentTarget.reset();
+}
+
+async function addBridgeSystemMessage(bridge, text) {
+  await addBridgeMessageRecord(bridge, {
+    id: crypto.randomUUID(),
+    author: state.currentMemberId,
+    authorEmail: normalizeEmail(currentMember().email || cloudState.user?.email),
+    type: "system",
+    text,
+    createdAt: new Date().toISOString(),
+  });
+}
+
+async function addBridgeMessageRecord(bridge, message) {
+  const normalized = normalizeBridgeMessages([message])[0];
+  if (!normalized) return;
+
+  if (cloudState.enabled && cloudState.user && cloudState.bridgesRef) {
+    await cloudState.bridgesRef.doc(bridge.id).collection("messages").doc(normalized.id).set(normalized);
+    await cloudState.bridgesRef.doc(bridge.id).set({ updatedAt: normalized.createdAt }, { merge: true });
+    return;
+  }
+
+  const target = state.bridges.find((item) => item.id === bridge.id);
+  if (!target) return;
+  target.messages = normalizeBridgeMessages([...(target.messages || []), normalized]);
+  target.updatedAt = normalized.createdAt;
+  saveState();
+  renderBridge();
+}
+
+async function archiveCurrentBridge() {
+  const bridge = getSelectedBridge();
+  if (!bridge || bridge.creator !== state.currentMemberId) return;
+  const confirmed = window.confirm(`Archive "${bridge.title}"?`);
+  if (!confirmed) return;
+
+  bridge.status = "archived";
+  bridge.updatedAt = new Date().toISOString();
+  await saveBridge(bridge);
+  await addBridgeSystemMessage(bridge, `${memberName(state.currentMemberId)} archived this Bridge.`);
+  closeBridgeDialog();
+  renderBridge();
 }
 
 function renderTrips() {
@@ -3384,6 +3872,9 @@ function populateFormOptions() {
     .join("");
   wishForm.priority.innerHTML = wishPriorities
     .map((priority) => `<option value="${priority.id}">${priority.label}</option>`)
+    .join("");
+  bridgeForm.status.innerHTML = bridgeStatuses
+    .map((status) => `<option value="${status.id}">${status.label}</option>`)
     .join("");
 }
 
@@ -5083,6 +5574,7 @@ function importState(event) {
         notes: normalizeNotes(imported.notes),
         trips: normalizeTrips(imported.trips),
         wishes: normalizeWishes(imported.wishes),
+        bridges: normalizeBridges(imported.bridges, normalizeMembers(imported.members)),
         expenses: normalizeExpenses(imported.expenses),
         creditCards: normalizeCreditCards(imported.creditCards),
         currentMemberId: imported.currentMemberId || "me",
@@ -5090,6 +5582,7 @@ function importState(event) {
       selectedTaskId = state.tasks[0]?.id ?? null;
       selectedTripId = state.trips[0]?.id ?? null;
       selectedWishId = state.wishes[0]?.id ?? null;
+      selectedBridgeId = state.bridges[0]?.id ?? null;
       saveState();
       render();
     } catch (error) {
@@ -5149,6 +5642,10 @@ function ensureTripDayForDate(trip, date) {
 
 function getSelectedWish() {
   return state.wishes.find((wish) => wish.id === selectedWishId) ?? null;
+}
+
+function getSelectedBridge() {
+  return state.bridges.find((bridge) => bridge.id === selectedBridgeId) ?? null;
 }
 
 function getTripEventsForDate(dateString) {
@@ -5565,6 +6062,40 @@ function wishLinkIcon(type) {
 
 function isClosedWish(wish) {
   return wish.status === "done" || wish.status === "archived";
+}
+
+function isClosedBridge(bridge) {
+  return bridge.status === "closed" || bridge.status === "archived";
+}
+
+function bridgeStatusLabel(status) {
+  return bridgeStatuses.find((item) => item.id === status)?.label ?? "Open";
+}
+
+function bridgeMessageTypeLabel(type) {
+  if (type === "system") return "System";
+  return bridgeMessageTypes.find((item) => item.id === type)?.label ?? "Message";
+}
+
+function bridgeMessageTypeIcon(type) {
+  if (type === "system") return "info";
+  return bridgeMessageTypes.find((item) => item.id === type)?.icon ?? "message-circle";
+}
+
+function getVisibleBridges() {
+  const currentEmail = normalizeEmail(currentMember().email || cloudState.user?.email);
+  return getSortedBridges().filter((bridge) => {
+    if (bridge.members.includes(state.currentMemberId)) return true;
+    return currentEmail && bridge.memberEmails.includes(currentEmail);
+  });
+}
+
+function getSortedBridges() {
+  return [...(state.bridges || [])].sort((a, b) => {
+    if (isClosedBridge(a) && !isClosedBridge(b)) return 1;
+    if (!isClosedBridge(a) && isClosedBridge(b)) return -1;
+    return b.updatedAt.localeCompare(a.updatedAt);
+  });
 }
 
 function getFilteredWishes() {

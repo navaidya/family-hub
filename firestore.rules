@@ -21,6 +21,26 @@ service cloud.firestore {
         );
     }
 
+    function familyDocExists(familyId) {
+      return exists(/databases/$(database)/documents/families/$(familyId));
+    }
+
+    function familyData(familyId) {
+      return get(/databases/$(database)/documents/families/$(familyId)).data;
+    }
+
+    function isFamilyMember(familyId) {
+      return isSignedIn()
+        && (
+          isLegacyDefaultFamilyMember(familyId)
+          || (
+            familyDocExists(familyId)
+            && familyData(familyId).allowedEmails is list
+            && signedInEmail() in familyData(familyId).allowedEmails
+          )
+        );
+    }
+
     function isLegacyDefaultFamilyMember(familyId) {
       return familyId == "default-family"
         && signedInEmail() in [
@@ -43,11 +63,62 @@ service cloud.firestore {
         && signedInEmail() in request.resource.data.allowedEmails;
     }
 
+    function isBridgeMember() {
+      return isSignedIn()
+        && resource.data.memberEmails is list
+        && signedInEmail() in resource.data.memberEmails;
+    }
+
+    function isCreatingBridge(familyId) {
+      return isFamilyMember(familyId)
+        && request.resource.data.memberEmails is list
+        && signedInEmail() in request.resource.data.memberEmails
+        && request.resource.data.creatorEmail == signedInEmail();
+    }
+
+    function isBridgeCreator() {
+      return isBridgeMember()
+        && resource.data.creatorEmail == signedInEmail();
+    }
+
+    function onlyTouchesBridgeUpdatedAt() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(["updatedAt"]);
+    }
+
+    function bridgeDocExists(familyId, bridgeId) {
+      return exists(/databases/$(database)/documents/families/$(familyId)/bridges/$(bridgeId));
+    }
+
+    function bridgeData(familyId, bridgeId) {
+      return get(/databases/$(database)/documents/families/$(familyId)/bridges/$(bridgeId)).data;
+    }
+
+    function isBridgeMessageMember(familyId, bridgeId) {
+      return isSignedIn()
+        && bridgeDocExists(familyId, bridgeId)
+        && bridgeData(familyId, bridgeId).memberEmails is list
+        && signedInEmail() in bridgeData(familyId, bridgeId).memberEmails;
+    }
+
     match /families/{familyId} {
       allow create: if isCreatingOwnFamily();
       allow read: if isExistingFamilyMember(familyId);
       allow update: if isExistingFamilyMember(familyId) && keepsRequesterAsMember();
       allow delete: if false;
+
+      match /bridges/{bridgeId} {
+        allow create: if isCreatingBridge(familyId);
+        allow read: if isBridgeMember();
+        allow update: if isBridgeCreator() || (isBridgeMember() && onlyTouchesBridgeUpdatedAt());
+        allow delete: if false;
+
+        match /messages/{messageId} {
+          allow read: if isBridgeMessageMember(familyId, bridgeId);
+          allow create: if isBridgeMessageMember(familyId, bridgeId)
+            && request.resource.data.authorEmail == signedInEmail();
+          allow update, delete: if false;
+        }
+      }
     }
   }
 }

@@ -1,6 +1,6 @@
 # Family Hub
 
-A browser-based family hub with tasks, Dreams, vacation planning, finance tracking, notebooks, dashboard summaries, and reminder composition.
+A browser-based family hub with tasks, Dreams, private Bridge channels, vacation planning, finance tracking, notebooks, dashboard summaries, and reminder composition.
 
 Open `index.html` in a browser for local testing, or use the GitHub Pages URL for the hosted app. Family data is saved locally until Firebase sync is configured and a Google account signs in.
 
@@ -38,7 +38,7 @@ Family Hub can sync shared family workspaces through Firebase Authentication, Cl
 8. Deploy/push this repo to GitHub Pages.
 9. Open Family Hub, sign in with Google, and configure the family workspace from the account menu.
 
-The website is still hosted by GitHub Pages. Firebase stores each family workspace in Google's cloud under `families/{familyId}`. Attachments are stored in Firebase Storage under `families/{familyId}/...`. Access is based on allowed member emails stored on that family document.
+The website is still hosted by GitHub Pages. Firebase stores each family workspace in Google's cloud under `families/{familyId}`. Private Bridge channels live under `families/{familyId}/bridges/{bridgeId}` and are readable only by selected members when `firestore.rules` is published. Attachments are stored in Firebase Storage under `families/{familyId}/...`. Access is based on allowed member emails stored on the relevant family or Bridge document.
 
 ## GitHub Pages deploy speed
 

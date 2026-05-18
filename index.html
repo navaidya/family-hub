@@ -136,6 +136,23 @@
         </div>
       </section>
 
+      <section class="bridge-panel tab-view" id="bridgeView" aria-label="Bridge private conversations">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">Private channels</p>
+            <h2>Bridge</h2>
+          </div>
+          <button class="primary-button" id="newBridgeBtn" type="button">
+            <i data-lucide="message-circle-plus"></i>
+            Start Bridge
+          </button>
+        </div>
+        <div class="bridge-grid">
+          <div class="bridge-list" id="bridgeList"></div>
+          <div class="bridge-detail" id="bridgeDetail"></div>
+        </div>
+      </section>
+
       <section class="travel-panel tab-view" id="vacationView" aria-label="Vacation plans">
         <div class="panel-heading">
           <div>
@@ -527,6 +544,63 @@
           <button class="primary-button" type="submit">
             <i data-lucide="save"></i>
             Save dream
+          </button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="bridgeDialog" class="task-dialog">
+      <form id="bridgeForm" method="dialog">
+        <div class="dialog-heading">
+          <div>
+            <p class="eyebrow">Bridge</p>
+            <h2 id="bridgeDialogTitle">Start Bridge</h2>
+          </div>
+          <button class="icon-button" id="closeBridgeDialogBtn" value="cancel" type="button" title="Close" aria-label="Close">
+            <i data-lucide="x">×</i>
+          </button>
+        </div>
+
+        <input id="bridgeId" type="hidden" />
+
+        <label>
+          Title
+          <input id="bridgeTitle" maxlength="90" required placeholder="Phone expectations, morning routine, vacation budget" />
+        </label>
+
+        <div class="form-grid">
+          <label>
+            Status
+            <select id="bridgeStatus"></select>
+          </label>
+
+          <label>
+            Creator
+            <input id="bridgeCreator" disabled />
+          </label>
+        </div>
+
+        <label>
+          Purpose
+          <textarea id="bridgePurpose" rows="4" maxlength="500" placeholder="What should this Bridge help us understand or resolve?"></textarea>
+        </label>
+
+        <section class="bridge-member-picker">
+          <div>
+            <strong>Members</strong>
+            <span>Only selected members can see this Bridge. The creator controls add/remove.</span>
+          </div>
+          <div class="bridge-member-grid" id="bridgeMemberGrid"></div>
+        </section>
+
+        <div class="dialog-actions">
+          <button class="secondary-button" id="archiveBridgeBtn" type="button">
+            <i data-lucide="archive"></i>
+            Archive
+          </button>
+          <button class="primary-button" type="submit">
+            <i data-lucide="save"></i>
+            Save Bridge
           </button>
         </div>
       </form>
