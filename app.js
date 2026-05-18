@@ -168,6 +168,7 @@ let pendingLoginMemberId = state.currentMemberId;
 let cloudState = createCloudState();
 let vacationItemCurrentAttachments = [];
 let vacationItemAttachmentsToDelete = new Set();
+let pendingBridgeIds = new Set();
 
 const elements = {
   authGate: document.querySelector("#authGate"),
@@ -1124,12 +1125,18 @@ function subscribeToBridges() {
       (snapshot) => {
         cloudState.error = "";
         const existingMessages = new Map(state.bridges.map((bridge) => [bridge.id, bridge.messages || []]));
+        const remoteBridgeIds = new Set(snapshot.docs.map((doc) => doc.id));
+        remoteBridgeIds.forEach((bridgeId) => pendingBridgeIds.delete(bridgeId));
+        const pendingBridges = state.bridges.filter((bridge) => pendingBridgeIds.has(bridge.id));
         state.bridges = normalizeBridges(
-          snapshot.docs.map((doc) => ({
-            id: doc.id,
-            ...doc.data(),
-            messages: existingMessages.get(doc.id) || [],
-          })),
+          [
+            ...snapshot.docs.map((doc) => ({
+              id: doc.id,
+              ...doc.data(),
+              messages: existingMessages.get(doc.id) || [],
+            })),
+            ...pendingBridges,
+          ],
           state.members,
         );
         if (!state.bridges.some((bridge) => bridge.id === selectedBridgeId)) {
@@ -2282,11 +2289,16 @@ async function saveBridgeFromForm(event) {
     const membershipChanged = previous && previous.members.slice().sort().join(",") !== members.slice().sort().join(",");
     await saveBridge(bridge);
     selectedBridgeId = id;
+    upsertBridgeLocally(bridge);
 
-    if (membershipChanged) {
-      await addBridgeSystemMessage(bridge, `Members updated by ${memberName(state.currentMemberId)}.`);
-    } else if (!previous) {
-      await addBridgeSystemMessage(bridge, `${memberName(state.currentMemberId)} started this Bridge.`);
+    try {
+      if (membershipChanged) {
+        await addBridgeSystemMessage(bridge, `Members updated by ${memberName(state.currentMemberId)}.`);
+      } else if (!previous) {
+        await addBridgeSystemMessage(bridge, `${memberName(state.currentMemberId)} started this Bridge.`);
+      }
+    } catch (messageError) {
+      console.warn("Bridge was saved, but the system message could not be saved.", messageError);
     }
 
     closeBridgeDialog();
@@ -2310,11 +2322,18 @@ async function saveBridge(bridge) {
   if (cloudState.enabled && cloudState.user && cloudState.bridgesRef) {
     const { messages, ...payload } = bridge;
     await cloudState.bridgesRef.doc(bridge.id).set(payload, { merge: true });
+    pendingBridgeIds.add(bridge.id);
+    upsertBridgeLocally(bridge);
     return;
   }
 
-  state.bridges = normalizeBridges([bridge, ...state.bridges.filter((item) => item.id !== bridge.id)], state.members);
+  upsertBridgeLocally(bridge);
   saveState();
+}
+
+function upsertBridgeLocally(bridge) {
+  state.bridges = normalizeBridges([bridge, ...state.bridges.filter((item) => item.id !== bridge.id)], state.members);
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
 }
 
 async function addBridgeMessage(event) {
