@@ -2190,7 +2190,7 @@ function renderBridgeMemberPicker(bridge, creator, isCreator) {
       const checked = selectedMembers.has(member.id);
       const locked = member.id === creator || !isCreator;
       return `
-        <label class="bridge-member-option ${checked ? "selected" : ""}">
+        <label class="bridge-member-option ${checked ? "selected" : ""} ${locked ? "locked" : ""}" data-bridge-member-option>
           <input type="checkbox" value="${escapeAttribute(member.id)}" ${checked ? "checked" : ""} ${locked ? "disabled" : ""} />
           <span class="avatar mini" style="background:${member.color}">${initials(member.name)}</span>
           <span>
@@ -2201,6 +2201,12 @@ function renderBridgeMemberPicker(bridge, creator, isCreator) {
       `;
     })
     .join("");
+
+  elements.bridgeMemberGrid.querySelectorAll("input[type='checkbox']").forEach((input) => {
+    input.addEventListener("change", () => {
+      input.closest("[data-bridge-member-option]")?.classList.toggle("selected", input.checked);
+    });
+  });
 }
 
 function closeBridgeDialog() {
@@ -2210,44 +2216,68 @@ function closeBridgeDialog() {
 
 async function saveBridgeFromForm(event) {
   event.preventDefault();
+  const submitButton = elements.bridgeForm.querySelector('button[type="submit"]');
+  const originalSubmitHTML = submitButton?.innerHTML;
   const existing = getSelectedBridge();
   const id = bridgeForm.id.value || crypto.randomUUID();
   const previous = state.bridges.find((bridge) => bridge.id === id);
   const creator = previous?.creator || state.currentMemberId;
   if (previous && creator !== state.currentMemberId) return;
 
-  const checkedMembers = [...elements.bridgeMemberGrid.querySelectorAll("input[type='checkbox']:checked")].map((input) => input.value);
-  const members = normalizeBridgeMembers(checkedMembers, creator);
-  const now = new Date().toISOString();
-  const bridge = {
-    id,
-    title: bridgeForm.title.value.trim(),
-    purpose: bridgeForm.purpose.value.trim(),
-    status: bridgeForm.status.value,
-    creator,
-    creatorEmail: normalizeEmail(getMember(creator)?.email || cloudState.user?.email),
-    members,
-    memberEmails: [
-      ...bridgeMemberEmails(members, previous?.memberEmails, state.members),
-      normalizeEmail(cloudState.user?.email),
-    ].filter(Boolean).filter((email, index, list) => list.indexOf(email) === index),
-    messages: previous?.messages || [],
-    createdAt: previous?.createdAt || now,
-    updatedAt: now,
-  };
-
-  const membershipChanged = previous && previous.members.slice().sort().join(",") !== members.slice().sort().join(",");
-  await saveBridge(bridge);
-  selectedBridgeId = id;
-
-  if (membershipChanged) {
-    await addBridgeSystemMessage(bridge, `Members updated by ${memberName(state.currentMemberId)}.`);
-  } else if (!previous) {
-    await addBridgeSystemMessage(bridge, `${memberName(state.currentMemberId)} started this Bridge.`);
+  if (submitButton) {
+    submitButton.disabled = true;
+    submitButton.setAttribute("aria-busy", "true");
+    submitButton.innerHTML = `<i data-lucide="loader-circle"></i>Saving...`;
+    refreshIcons();
   }
 
-  closeBridgeDialog();
-  renderBridge();
+  try {
+    const checkedMembers = [...elements.bridgeMemberGrid.querySelectorAll("input[type='checkbox']:checked")].map((input) => input.value);
+    const members = normalizeBridgeMembers([...checkedMembers, creator], creator);
+    const signedInEmail = normalizeEmail(cloudState.user?.email);
+    const now = new Date().toISOString();
+    const bridge = {
+      id,
+      title: bridgeForm.title.value.trim(),
+      purpose: bridgeForm.purpose.value.trim(),
+      status: bridgeForm.status.value,
+      creator,
+      creatorEmail: normalizeEmail(signedInEmail || getMember(creator)?.email),
+      members,
+      memberEmails: [
+        ...bridgeMemberEmails(members, previous?.memberEmails, state.members),
+        signedInEmail,
+      ].filter(Boolean).filter((email, index, list) => list.indexOf(email) === index),
+      messages: previous?.messages || [],
+      createdAt: previous?.createdAt || now,
+      updatedAt: now,
+    };
+
+    const membershipChanged = previous && previous.members.slice().sort().join(",") !== members.slice().sort().join(",");
+    await saveBridge(bridge);
+    selectedBridgeId = id;
+
+    if (membershipChanged) {
+      await addBridgeSystemMessage(bridge, `Members updated by ${memberName(state.currentMemberId)}.`);
+    } else if (!previous) {
+      await addBridgeSystemMessage(bridge, `${memberName(state.currentMemberId)} started this Bridge.`);
+    }
+
+    closeBridgeDialog();
+    renderBridge();
+  } catch (error) {
+    console.error("Could not save Bridge", error);
+    cloudState.error = error.message || "Could not save this Bridge.";
+    renderCloudStatus();
+    window.alert(`Could not save this Bridge: ${cloudState.error}`);
+  } finally {
+    if (submitButton) {
+      submitButton.disabled = !(!previous || creator === state.currentMemberId);
+      submitButton.removeAttribute("aria-busy");
+      submitButton.innerHTML = originalSubmitHTML || `<i data-lucide="save"></i>Save Bridge`;
+      refreshIcons();
+    }
+  }
 }
 
 async function saveBridge(bridge) {
@@ -2273,7 +2303,7 @@ async function addBridgeMessage(event) {
   await addBridgeMessageRecord(bridge, {
     id: crypto.randomUUID(),
     author: state.currentMemberId,
-    authorEmail: normalizeEmail(currentMember().email || cloudState.user?.email),
+    authorEmail: normalizeEmail(cloudState.user?.email || currentMember().email),
     type: String(data.get("type") || "message"),
     text,
     createdAt: new Date().toISOString(),
@@ -2285,7 +2315,7 @@ async function addBridgeSystemMessage(bridge, text) {
   await addBridgeMessageRecord(bridge, {
     id: crypto.randomUUID(),
     author: state.currentMemberId,
-    authorEmail: normalizeEmail(currentMember().email || cloudState.user?.email),
+    authorEmail: normalizeEmail(cloudState.user?.email || currentMember().email),
     type: "system",
     text,
     createdAt: new Date().toISOString(),
