@@ -26,43 +26,57 @@
     <section class="auth-gate" id="authGate" aria-label="Family Hub sign in">
       <div class="auth-card">
         <div class="auth-copy">
+          <div class="auth-family-bar" aria-label="Family members">
+            <span>N</span>
+            <span>P</span>
+            <span>V</span>
+            <span>Y</span>
+          </div>
           <div class="auth-brand">
-            <span class="auth-mark" aria-hidden="true"><i data-lucide="home"></i></span>
             <div>
-              <p class="eyebrow">Private family workspace</p>
+              <p class="eyebrow">Vaidya family workspace</p>
               <h1>Family Hub</h1>
             </div>
           </div>
           <p class="auth-lede">
-            One shared place for tasks, dreams, vacation plans, finance reminders, notebooks, and family conversations.
+            A private home base for plans, responsibilities, ideas, trips, bills, notes, and the conversations that keep family life moving.
           </p>
-          <div class="auth-feature-grid" aria-label="Family Hub sections">
-            <div class="auth-feature">
-              <i data-lucide="check-circle-2"></i>
-              <span>Tasks</span>
-              <small>Owners, due dates, and progress</small>
+          <div class="auth-household-card">
+            <div>
+              <p class="eyebrow">Tonight's hub</p>
+              <h2>Everyone sees the same plan</h2>
             </div>
-            <div class="auth-feature">
-              <i data-lucide="sparkles"></i>
-              <span>Dreams</span>
-              <small>Ideas, research, and discussion</small>
-            </div>
-            <div class="auth-feature">
-              <i data-lucide="map"></i>
-              <span>Vacation</span>
-              <small>Trips, stops, hotels, and maps</small>
-            </div>
-            <div class="auth-feature">
-              <i data-lucide="wallet-cards"></i>
-              <span>Finance</span>
-              <small>Bills, cards, and reminders</small>
+            <div class="auth-feature-grid" aria-label="Family Hub sections">
+              <div class="auth-feature">
+                <i data-lucide="check-circle-2"></i>
+                <span>Tasks</span>
+              </div>
+              <div class="auth-feature">
+                <i data-lucide="sparkles"></i>
+                <span>Dreams</span>
+              </div>
+              <div class="auth-feature">
+                <i data-lucide="map"></i>
+                <span>Vacation</span>
+              </div>
+              <div class="auth-feature">
+                <i data-lucide="messages-square"></i>
+                <span>Bridge</span>
+              </div>
             </div>
           </div>
         </div>
         <div class="auth-panel">
+          <div class="auth-panel-card">
+            <span class="auth-mark" aria-hidden="true"><i data-lucide="home"></i></span>
+            <div>
+              <strong>Private family access</strong>
+              <span>Naval, Priyanka, Vivan, and Yuvika</span>
+            </div>
+          </div>
           <div class="auth-panel-heading">
             <p class="eyebrow">Secure sign in</p>
-            <h2>Welcome back</h2>
+            <h2>Welcome home</h2>
             <p>Use your approved family Google account to open the shared hub.</p>
           </div>
           <button class="google-button auth-google-button" id="authGoogleBtn" type="button">
@@ -71,6 +85,7 @@
           </button>
           <div class="auth-trust-row">
             <span><i data-lucide="shield-check"></i> Family-only access</span>
+            <span><i data-lucide="smartphone"></i> Works on iPhone and Mac</span>
             <span><i data-lucide="refresh-cw"></i> Synced across devices</span>
           </div>
           <p class="form-error" id="authStatus" role="status"></p>
