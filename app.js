@@ -1102,14 +1102,19 @@ function isFirebaseConfigured() {
 }
 
 function getActiveFamilyId() {
-  return localStorage.getItem(FAMILY_ID_KEY) || window.FAMILY_HUB_FIREBASE_OPTIONS?.familyId || "default-family";
+  return configuredFamilyId() || localStorage.getItem(FAMILY_ID_KEY) || "default-family";
 }
 
 function setActiveFamilyId(familyId) {
-  const normalized = normalizeFamilyId(familyId);
+  const normalized = configuredFamilyId() || normalizeFamilyId(familyId);
   localStorage.setItem(FAMILY_ID_KEY, normalized);
   if (state.family) state.family.id = normalized;
   return normalized;
+}
+
+function configuredFamilyId() {
+  const familyId = String(window.FAMILY_HUB_FIREBASE_OPTIONS?.familyId || "").trim();
+  return familyId ? normalizeFamilyId(familyId) : "";
 }
 
 function normalizeFamilyId(value) {
