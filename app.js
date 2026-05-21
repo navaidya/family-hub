@@ -782,6 +782,29 @@ function normalizeBridges(bridges = [], members = familyMembers) {
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 }
 
+function mergeBridgeLists(primary = [], fallback = [], members = familyMembers) {
+  const bridgeMap = new Map();
+  [...normalizeBridges(fallback, members), ...normalizeBridges(primary, members)].forEach((bridge) => {
+    const existing = bridgeMap.get(bridge.id);
+    if (!existing || bridge.updatedAt >= existing.updatedAt) {
+      bridgeMap.set(bridge.id, {
+        ...existing,
+        ...bridge,
+        messages: mergeBridgeMessages(existing?.messages || [], bridge.messages || []),
+      });
+    }
+  });
+  return normalizeBridges([...bridgeMap.values()], members);
+}
+
+function mergeBridgeMessages(...messageGroups) {
+  const messageMap = new Map();
+  normalizeBridgeMessages(messageGroups.flat()).forEach((message) => {
+    messageMap.set(message.id, message);
+  });
+  return normalizeBridgeMessages([...messageMap.values()]);
+}
+
 function normalizeBridgeMembers(members = [], creator = state?.currentMemberId || "me") {
   const ids = Array.isArray(members) ? members.map(getKnownMemberId).filter(Boolean) : [];
   return [...new Set([creator, ...ids].filter(Boolean))];
@@ -1169,7 +1192,7 @@ function subscribeToBridges() {
         const existingMessages = new Map(state.bridges.map((bridge) => [bridge.id, bridge.messages || []]));
         const remoteBridgeIds = new Set(snapshot.docs.map((doc) => doc.id));
         remoteBridgeIds.forEach((bridgeId) => pendingBridgeIds.delete(bridgeId));
-        const pendingBridges = state.bridges.filter((bridge) => pendingBridgeIds.has(bridge.id));
+        const existingFallbackBridges = state.bridges.filter((bridge) => !remoteBridgeIds.has(bridge.id));
         state.bridges = normalizeBridges(
           [
             ...snapshot.docs.map((doc) => ({
@@ -1177,7 +1200,7 @@ function subscribeToBridges() {
               ...doc.data(),
               messages: existingMessages.get(doc.id) || [],
             })),
-            ...pendingBridges,
+            ...existingFallbackBridges,
           ],
           state.members,
         );
@@ -1213,7 +1236,9 @@ function subscribeToSelectedBridgeMessages() {
       (snapshot) => {
         const bridge = state.bridges.find((item) => item.id === selectedBridgeId);
         if (!bridge) return;
-        bridge.messages = normalizeBridgeMessages(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
+        const remoteMessages = normalizeBridgeMessages(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
+        bridge.messages = remoteMessages.length ? mergeBridgeMessages(bridge.messages, remoteMessages) : normalizeBridgeMessages(bridge.messages);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
         renderBridgeDetail();
       },
       (error) => {
@@ -1226,6 +1251,8 @@ function applyRemoteFamilyData(data = {}) {
   cloudState.applyingRemote = true;
   const members = normalizeMembers(data.members);
   const signedInMemberId = memberIdForGoogleUser(cloudState.user, members);
+  const remoteFamilyBridges = normalizeBridges(data.bridges, members);
+  const currentBridges = normalizeBridges(state.bridges, members);
   state = {
     family: normalizeFamilyProfile(data.family || data, members),
     members,
@@ -1233,7 +1260,7 @@ function applyRemoteFamilyData(data = {}) {
     notes: normalizeNotes(data.notes),
     trips: normalizeTrips(data.trips),
     wishes: normalizeWishes(data.wishes),
-    bridges: normalizeBridges(state.bridges, members),
+    bridges: mergeBridgeLists(remoteFamilyBridges, currentBridges, members),
     expenses: normalizeExpenses(data.expenses),
     creditCards: normalizeCreditCards(data.creditCards),
     currentMemberId: signedInMemberId || localStorage.getItem(LOCAL_PROFILE_KEY) || state.currentMemberId || "me",
@@ -1309,6 +1336,7 @@ function saveCloudState(force = false) {
     notes: state.notes,
     trips: state.trips,
     wishes: state.wishes,
+    bridges: state.bridges,
     expenses: state.expenses,
     creditCards: state.creditCards,
     updatedBy: cloudState.user.email || cloudState.user.uid,
@@ -1779,7 +1807,7 @@ function renderMainTabs() {
           tasks: state.tasks.filter((task) => task.status !== "done").length,
           home: getHomeAttentionCount(),
           wishlist: state.wishes.filter((wish) => !isClosedWish(wish)).length,
-          bridge: state.bridges.filter((bridge) => !isClosedBridge(bridge)).length,
+          bridge: getVisibleBridges().filter((bridge) => !isClosedBridge(bridge)).length,
           vacation: state.trips.length,
           finance: getExpensesForFinanceMonth().length,
         }[view.id] ?? 0;
@@ -2526,6 +2554,7 @@ async function saveBridge(bridge) {
     }
     pendingBridgeIds.add(bridge.id);
     upsertBridgeLocally(bridge);
+    await saveBridgeSnapshotToFamilyDoc(bridge.id);
     return;
   }
 
@@ -2552,6 +2581,49 @@ function getBridgeCollectionForWrite() {
   }
 
   return cloudState.bridgesRef;
+}
+
+async function saveBridgeSnapshotToFamilyDoc(requiredBridgeId = "") {
+  if (!cloudState.configured) return;
+  if (!cloudState.enabled || !cloudState.db || !cloudState.user) {
+    throw new Error("Bridge was not saved because Firebase is not ready. Please sign in again and retry.");
+  }
+
+  const familyId = getActiveFamilyId();
+  if (!cloudState.familyRef || cloudState.familyId !== familyId) {
+    cloudState.familyId = familyId;
+    cloudState.familyRef = cloudState.db.collection("families").doc(familyId);
+  }
+
+  const signedInEmail = normalizeEmail(cloudState.user.email);
+  await cloudState.familyRef.set(
+    {
+      family: normalizeFamilyProfile(
+        {
+          ...state.family,
+          id: familyId,
+          ownerEmail: state.family?.ownerEmail || signedInEmail || "",
+          allowedEmails: familyAllowedEmails(),
+          updatedAt: new Date().toISOString(),
+        },
+        state.members,
+      ),
+      allowedEmails: familyAllowedEmails(),
+      ownerEmail: state.family?.ownerEmail || signedInEmail || "",
+      members: state.members,
+      bridges: state.bridges,
+      updatedBy: cloudState.user.email || cloudState.user.uid,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    },
+    { merge: true },
+  );
+
+  if (!requiredBridgeId) return;
+  const familySnapshot = await cloudState.familyRef.get();
+  const savedBridges = familySnapshot.data()?.bridges || [];
+  if (!Array.isArray(savedBridges) || !savedBridges.some((bridge) => bridge?.id === requiredBridgeId)) {
+    throw new Error("Firebase did not confirm the Bridge in the family datastore.");
+  }
 }
 
 function upsertBridgeLocally(bridge) {
@@ -2605,6 +2677,7 @@ async function addBridgeMessageRecord(bridge, message) {
     await bridgeRef.doc(bridge.id).collection("messages").doc(normalized.id).set(normalized);
     await bridgeRef.doc(bridge.id).set({ updatedAt: normalized.createdAt }, { merge: true });
     upsertBridgeMessageLocally(bridge.id, normalized);
+    await saveBridgeSnapshotToFamilyDoc(bridge.id);
     renderBridge();
     return;
   }
