@@ -2503,16 +2503,50 @@ async function saveBridgeFromForm(event) {
 }
 
 async function saveBridge(bridge) {
-  if (cloudState.enabled && cloudState.user && cloudState.bridgesRef) {
+  const bridgeRef = getBridgeCollectionForWrite();
+  if (bridgeRef) {
     const { messages, ...payload } = bridge;
-    await cloudState.bridgesRef.doc(bridge.id).set(payload, { merge: true });
+    const docRef = bridgeRef.doc(bridge.id);
+    await docRef.set(
+      {
+        ...payload,
+        familyId: getActiveFamilyId(),
+        savedBy: normalizeEmail(cloudState.user?.email),
+      },
+      { merge: true },
+    );
+    const savedSnapshot = await docRef.get();
+    if (!savedSnapshot.exists) {
+      throw new Error("Firebase accepted the request, but the Bridge document could not be verified.");
+    }
     pendingBridgeIds.add(bridge.id);
     upsertBridgeLocally(bridge);
     return;
   }
 
+  if (cloudState.configured) {
+    throw new Error("Bridge was not saved because Firebase is not ready. Please sign in again and retry.");
+  }
+
   upsertBridgeLocally(bridge);
   saveState();
+}
+
+function getBridgeCollectionForWrite() {
+  if (!cloudState.configured) return null;
+  if (!cloudState.enabled || !cloudState.db || !cloudState.user) return null;
+
+  const familyId = getActiveFamilyId();
+  if (!cloudState.familyRef || cloudState.familyId !== familyId) {
+    cloudState.familyId = familyId;
+    cloudState.familyRef = cloudState.db.collection("families").doc(familyId);
+  }
+
+  if (!cloudState.bridgesRef) {
+    cloudState.bridgesRef = cloudState.familyRef.collection("bridges");
+  }
+
+  return cloudState.bridgesRef;
 }
 
 function upsertBridgeLocally(bridge) {
@@ -2529,15 +2563,20 @@ async function addBridgeMessage(event) {
   const text = String(data.get("text") || "").trim();
   if (!text) return;
 
-  await addBridgeMessageRecord(bridge, {
-    id: crypto.randomUUID(),
-    author: state.currentMemberId,
-    authorEmail: normalizeEmail(cloudState.user?.email || currentMember().email),
-    type: String(data.get("type") || "message"),
-    text,
-    createdAt: new Date().toISOString(),
-  });
-  event.currentTarget.reset();
+  try {
+    await addBridgeMessageRecord(bridge, {
+      id: crypto.randomUUID(),
+      author: state.currentMemberId,
+      authorEmail: normalizeEmail(cloudState.user?.email || currentMember().email),
+      type: String(data.get("type") || "message"),
+      text,
+      createdAt: new Date().toISOString(),
+    });
+    event.currentTarget.reset();
+  } catch (error) {
+    console.error("Could not save Bridge message", error);
+    window.alert(`Could not save this Bridge message: ${error.message || "Firebase save failed."}`);
+  }
 }
 
 async function addBridgeSystemMessage(bridge, text) {
@@ -2555,12 +2594,17 @@ async function addBridgeMessageRecord(bridge, message) {
   const normalized = normalizeBridgeMessages([message])[0];
   if (!normalized) return;
 
-  if (cloudState.enabled && cloudState.user && cloudState.bridgesRef) {
-    await cloudState.bridgesRef.doc(bridge.id).collection("messages").doc(normalized.id).set(normalized);
-    await cloudState.bridgesRef.doc(bridge.id).set({ updatedAt: normalized.createdAt }, { merge: true });
+  const bridgeRef = getBridgeCollectionForWrite();
+  if (bridgeRef) {
+    await bridgeRef.doc(bridge.id).collection("messages").doc(normalized.id).set(normalized);
+    await bridgeRef.doc(bridge.id).set({ updatedAt: normalized.createdAt }, { merge: true });
     upsertBridgeMessageLocally(bridge.id, normalized);
     renderBridge();
     return;
+  }
+
+  if (cloudState.configured) {
+    throw new Error("Bridge message was not saved because Firebase is not ready. Please sign in again and retry.");
   }
 
   upsertBridgeMessageLocally(bridge.id, normalized);
