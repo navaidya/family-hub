@@ -2556,10 +2556,11 @@ function upsertBridgeLocally(bridge) {
 
 async function addBridgeMessage(event) {
   event.preventDefault();
+  const formElement = event.currentTarget;
   const bridge = getSelectedBridge();
   if (!bridge || isClosedBridge(bridge)) return;
 
-  const data = new FormData(event.currentTarget);
+  const data = new FormData(formElement);
   const text = String(data.get("text") || "").trim();
   if (!text) return;
 
@@ -2572,7 +2573,7 @@ async function addBridgeMessage(event) {
       text,
       createdAt: new Date().toISOString(),
     });
-    event.currentTarget.reset();
+    formElement.reset();
   } catch (error) {
     console.error("Could not save Bridge message", error);
     window.alert(`Could not save this Bridge message: ${error.message || "Firebase save failed."}`);
